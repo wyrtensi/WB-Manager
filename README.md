@@ -1,5 +1,7 @@
 # WB Manager Assist App (разработка прекращена, deprecated)
 
+Скажу сразу, я не виноват в уязвимостях базы данных, wildberries не дает возможности отправить отзыв простому человеку, также я убрал возможность доступа к кодам клиентов.
+
 > Система, которая превращает ПВЗ Wildberries в цифровой контрольный центр: аналитика склада, карточки клиентов, приёмка поставок и Telegram-бот в одном стеке.
 
 ![Stack](https://img.shields.io/badge/Flask-3.0+-black?logo=flask&logoColor=white) ![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white) ![Telegram](https://img.shields.io/badge/Telegram%20Bot-PTB%2020-blue?logo=telegram)
