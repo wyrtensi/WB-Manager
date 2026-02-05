@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}WB Manager{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <a href="/" class="logo" title="WB Manager">
+                <div class="logo-icon">WB</div>
+                <span class="logo-text">Manager</span>
+            </a>
+            
+            <nav>
+                <div class="nav-section">
+                    <div class="nav-section-title">Главное</div>
+                    <a href="/" class="nav-item">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                        </svg>
+                        <span>Обзор</span>
+                    </a>
+                </div>
+                
+                <div class="nav-section">
+                    <div class="nav-section-title">Клиенты</div>
+                    <a href="/buyers" class="nav-item">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                        <span>Все клиенты</span>
+                        <span class="nav-badge" id="nav-buyers">-</span>
+                    </a>
+                    <a href="/buyers?view=try-on" class="nav-item">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V5a4 4 0 118 0v2m4 4.5v4.75A2.75 2.75 0 0117.25 19H6.75A2.75 2.75 0 014 16.25V11.5A2.5 2.5 0 016.5 9h11A2.5 2.5 0 0120 11.5z" />
+                        </svg>
+                        <span>На примерке</span>
+                        <span class="nav-badge" id="nav-buyers-tryon">-</span>
+                    </a>
+                </div>
+
+                <div class="nav-section">
+                    <div class="nav-section-title">Товары</div>
+                    <a href="/goods" class="nav-item">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                        </svg>
+                        <span>На ПВЗ</span>
+                        <span class="nav-badge" id="nav-goods-pickup">-</span>
+                    </a>
+                    <a href="/goods/on-way" class="nav-item">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
+                        </svg>
+                        <span>В пути</span>
+                        <span class="nav-badge" id="nav-goods-onway">-</span>
+                    </a>
+                    <a href="/surplus" class="nav-item">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        <span>Излишки</span>
+                        <span class="nav-badge" id="nav-surplus">-</span>
+                    </a>
+                </div>
+                
+                
+                <div class="nav-section">
+                    <div class="nav-section-title">История</div>
+                    <a href="/history" class="nav-item">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span>Выдачи</span>
+                    </a>
+                </div>
+
+                <div class="nav-section">
+                    <div class="nav-section-title">Модули</div>
+                    <a href="/voiceover" class="nav-item">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                        </svg>
+                        <span>Озвучка</span>
+                    </a>
+                    <a href="/bot" class="nav-item">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                        </svg>
+                        <span>Telegram Бот</span>
+                    </a>
+                </div>
+                
+                <div class="nav-section nav-section-bottom">
+                    <div class="nav-section-title">Служебное</div>
+                    <a href="#" class="nav-item nav-item-danger" onclick="event.preventDefault(); openCriticalSettings();">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <span>Критические настройки</span>
+                    </a>
+                </div>
+            </nav>
+        </aside>
+        
+        <!-- Модальное окно критических настроек -->
+        <div id="critical-settings-modal" class="modal-overlay" onclick="closeCriticalSettings()">
+            <div class="modal-content critical-modal" onclick="event.stopPropagation()">
+                <button class="modal-close" onclick="closeCriticalSettings()">
+                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+                <div class="critical-modal-header">
+                    <p class="critical-modal-kicker">Чувствительные операции</p>
+                    <h2 class="modal-title">⚠️ Критические настройки</h2>
+                    <p class="modal-subtitle">Используйте их осознанно: действия ниже влияют на кеширование изображений и общую нагрузку приложения.</p>
+                </div>
+                <div class="critical-settings-grid">
+                    <article class="critical-setting-card critical-setting-card--danger">
+                        <div class="critical-setting-card__head">
+                            <div class="critical-setting-icon" aria-hidden="true">🧹</div>
+                            <div class="critical-setting-text">
+                                <p class="critical-setting-kicker">Техподдержка</p>
+                                <h3 class="critical-setting-title">Очистить кэш картинок</h3>
+                                <p class="critical-setting-desc">Удаляет все сохранённые URL изображений товаров. Полезно, если наблюдаются сломанные изображения или требуется принудительное обновление.</p>
+                            </div>
+                            <span class="critical-setting-pill critical-setting-pill--danger">Глубокий сброс</span>
+                        </div>
+                        <div class="critical-setting-meta">
+                            <div>
+                                <span class="critical-setting-label">В кэше сейчас</span>
+                                <span class="critical-setting-count" id="image-cache-count">Загрузка...</span>
+                            </div>
+                            <button class="btn btn-danger" onclick="clearImageCache()">
+                                🗑️ Очистить кэш
+                            </button>
+                        </div>
+                        <p class="critical-setting-hint">Картинки подгрузятся заново при следующем визите на страницы с товарами.</p>
+                    </article>
+                </div>
+                <div class="critical-settings-callout">
+                    <span class="critical-settings-callout__icon">💡</span>
+                    <div>
+                        <p class="critical-settings-callout__title">Совет</p>
+                        <p class="critical-settings-callout__text">Меняйте настройки вне пикового времени. После очистки кэша оставьте вкладку открытой, чтобы очередь успела спокойно обновить изображения.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Main Content -->
+        <main class="main-content">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+    
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script>
+        // Загрузка счётчиков в навигацию
+        (async function loadNavStats() {
+            try {
+                const stats = await API.get('/stats');
+                const navPickup = document.getElementById('nav-goods-pickup');
+                const navOnway = document.getElementById('nav-goods-onway');
+                const navSurplus = document.getElementById('nav-surplus');
+                const navBuyers = document.getElementById('nav-buyers');
+                const navBuyersTryOn = document.getElementById('nav-buyers-tryon');
+                
+                if (navPickup && stats.goods_at_pickup !== undefined) navPickup.textContent = stats.goods_at_pickup;
+                if (navOnway && stats.goods_on_way !== undefined) navOnway.textContent = stats.goods_on_way;
+                if (navSurplus && stats.surplus_count !== undefined) navSurplus.textContent = stats.surplus_count;
+                if (navBuyers && stats.total_buyers !== undefined) navBuyers.textContent = stats.total_buyers;
+                if (navBuyersTryOn && stats.buyers_on_try_on !== undefined) navBuyersTryOn.textContent = stats.buyers_on_try_on;
+            } catch (e) {
+                console.error('Failed to load nav stats:', e);
+            }
+        })();
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

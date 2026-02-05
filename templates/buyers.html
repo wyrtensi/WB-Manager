@@ -1,0 +1,865 @@
+{% extends "base.html" %}
+
+{% block title %}Клиенты - WB Manager{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">База клиентов</h1>
+</div>
+
+<!-- Поиск -->
+<div class="search-row">
+    <div class="search-container" style="flex: 1;">
+        <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+        <input type="text" id="buyers-search" class="search-input" 
+               placeholder="Поиск по телефону, имени или ID...">
+    </div>
+    <div class="search-container cell-search-container">
+        <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+        </svg>
+        <input type="text" id="cell-search" class="search-input" 
+               placeholder="Ячейка..." style="width: 120px;">
+    </div>
+</div>
+
+<!-- Фильтры -->
+<div class="tabs buyer-tabs" style="margin-bottom: 16px;" id="buyers-tabs">
+    <button class="tab active" data-filter="with-cell">С ячейкой</button>
+    <button class="tab" data-filter="waiting">Ждут заказ</button>
+    <button class="tab" data-filter="all">Все клиенты</button>
+    <button class="tab" data-filter="try-on">На примерке</button>
+</div>
+
+<!-- Панель примерки -->
+<div class="try-on-toolbar" id="try-on-toolbar" style="display:none;">
+    <div class="try-on-toolbar-info">
+        <div class="try-on-toolbar-title">Мониторинг клиентов находящихся на примерке</div>
+        <div class="try-on-toolbar-meta">
+            <span id="try-on-auto-label">Обновление вручную</span>
+            <span class="divider">•</span>
+            <span id="try-on-last-refresh">Данные ещё не загружены</span>
+            <span class="divider">•</span>
+            <span id="try-on-next-refresh">Обновите вручную по кнопке</span>
+        </div>
+    </div>
+    <div class="try-on-toolbar-actions">
+        <button class="btn btn-secondary" id="try-on-refresh-btn">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Обновить список клиентов на примерке
+        </button>
+    </div>
+</div>
+
+<!-- Список клиентов -->
+<div class="section">
+    <div class="section-content" style="display: grid; gap: 12px;" id="buyers-container">
+        <div class="loading">
+            <div class="loading-spinner"></div>
+        </div>
+    </div>
+    <div id="load-more-trigger" style="height: 50px;"></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+
+const BUYERS_LIMIT = 30;
+const TRY_ON_MANUAL_HINT = 'Обновите вручную по кнопке';
+
+let buyersPage = 0;
+let buyersFilter = 'with-cell';
+let buyersLoading = false;
+let buyersHasMore = true;
+let tryOnLoading = false;
+let lastTryOnRefreshAt = null;
+const tryOnNoteTimers = new Map();
+const tryOnGoodsCache = new Map();
+
+const params = new URLSearchParams(window.location.search);
+// buyersFilter будет выставлен в initializeTabsAndFilter()
+
+const searchInput = document.getElementById('buyers-search');
+const cellInput = document.getElementById('cell-search');
+const buyersContainer = document.getElementById('buyers-container');
+const tryOnToolbar = document.getElementById('try-on-toolbar');
+const tryOnRefreshBtn = document.getElementById('try-on-refresh-btn');
+
+if (typeof window._buyersSearchTimeout === 'undefined') window._buyersSearchTimeout = null;
+
+searchInput.addEventListener('input', handleDelayedSearch);
+cellInput.addEventListener('input', handleDelayedSearch);
+tryOnRefreshBtn.addEventListener('click', () => {
+    if (buyersFilter === 'try-on') {
+        loadTryOnBuyers(true);
+    }
+});
+
+function setActiveTab(filter) {
+    buyersFilter = filter;
+    document.querySelectorAll('#buyers-tabs .tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.filter === filter);
+    });
+    toggleTryOnToolbar(filter === 'try-on');
+    resetAndLoadBuyers();
+}
+
+// Инициализация вкладок и фильтра при загрузке
+function initializeTabsAndFilter() {
+    // buyersFilter только из URL (view) или по умолчанию
+    if (params.get('view') === 'try-on') {
+        buyersFilter = 'try-on';
+    } else {
+        buyersFilter = 'with-cell';
+    }
+    // Активируем вкладку по buyersFilter
+    document.querySelectorAll('#buyers-tabs .tab').forEach(tab => {
+        tab.classList.remove('active');
+        if (tab.dataset.filter === buyersFilter) {
+            tab.classList.add('active');
+        }
+        tab.addEventListener('click', () => {
+            if (buyersFilter === tab.dataset.filter) return;
+            setActiveTab(tab.dataset.filter);
+        });
+    });
+    toggleTryOnToolbar(buyersFilter === 'try-on');
+    console.debug('[buyers] initializeTabsAndFilter -> buyersFilter=', buyersFilter);
+}
+
+function handleDelayedSearch() {
+    clearTimeout(window._buyersSearchTimeout);
+    window._buyersSearchTimeout = setTimeout(() => resetAndLoadBuyers(), 300);
+}
+
+function toggleTryOnToolbar(show) {
+    if (!tryOnToolbar) return;
+    tryOnToolbar.style.display = show ? 'flex' : 'none';
+    if (show) {
+        updateTryOnStatusTexts();
+    }
+}
+
+function resetAndLoadBuyers() {
+    buyersPage = 0;
+    buyersHasMore = true;
+    buyersContainer.classList.toggle('tryon-mode', buyersFilter === 'try-on');
+    buyersContainer.innerHTML = '';
+    console.debug('[buyers] resetAndLoadBuyers -> buyersFilter=', buyersFilter);
+    if (buyersFilter === 'try-on') {
+        loadTryOnBuyers(true);
+    } else {
+        loadMoreBuyers();
+    }
+}
+
+async function loadMoreBuyers() {
+    if (buyersFilter === 'try-on' || buyersLoading || !buyersHasMore) return;
+    
+    buyersLoading = true;
+    const container = buyersContainer;
+    const search = searchInput.value;
+    
+    if (buyersPage === 0) {
+        showLoading(container);
+    }
+    
+    try {
+        const offset = buyersPage * BUYERS_LIMIT;
+        const cellSearch = cellInput.value.trim();
+        // Гарантируем, что фильтр всегда передаётся явно
+        let filter = buyersFilter || 'with-cell';
+        let endpoint = `/buyers?limit=${BUYERS_LIMIT}&offset=${offset}`;
+        if (search) endpoint += `&q=${encodeURIComponent(search)}`;
+        if (cellSearch) endpoint += `&cell=${encodeURIComponent(cellSearch)}`;
+        if (filter !== 'all') endpoint += `&filter=${filter}`;
+
+        console.debug('[buyers] loadMoreBuyers -> endpoint=', endpoint);
+        const data = await API.get(endpoint);
+
+        if (buyersPage === 0) {
+            container.innerHTML = '';
+        }
+
+        if (!data.buyers || data.buyers.length === 0) {
+            buyersHasMore = false;
+            if (buyersPage === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">👤</div>
+                        <div class="empty-state-title">Клиенты не найдены</div>
+                    </div>
+                `;
+            }
+        } else {
+            // Добавляем порядковый номер (индекс + 1 + offset)
+            data.buyers.forEach((buyer, idx) => {
+                container.appendChild(createBuyerCardElement(buyer, idx + 1 + offset));
+            });
+            buyersHasMore = data.has_more !== false && data.buyers.length === BUYERS_LIMIT;
+            buyersPage++;
+        }
+    } catch (err) {
+        console.error('Load buyers error:', err);
+        if (buyersPage === 0) {
+            showError(container, 'Ошибка загрузки');
+        }
+    } finally {
+        buyersLoading = false;
+    }
+}
+
+async function loadTryOnBuyers(force = false) {
+    if (tryOnLoading && !force) return;
+    tryOnLoading = true;
+    const container = buyersContainer;
+    showLoading(container);
+    try {
+        const search = searchInput.value.trim();
+        const cellSearch = cellInput.value.trim();
+        let endpoint = '/buyers?filter=try-on';
+        console.debug('[buyers] loadTryOnBuyers -> buyersFilter=', buyersFilter, ' endpoint start=', endpoint);
+        if (search) endpoint += `&q=${encodeURIComponent(search)}`;
+        if (cellSearch) endpoint += `&cell=${encodeURIComponent(cellSearch)}`;
+        const data = await API.get(endpoint);
+        renderTryOnCards(data.buyers || []);
+        markTryOnRefreshCompleted();
+    } catch (err) {
+        console.error('Load try-on buyers error:', err);
+        showError(container, 'Не удалось загрузить клиентов на примерке');
+    } finally {
+        tryOnLoading = false;
+    }
+}
+
+function createBuyerCardElement(buyer, index) {
+    const div = document.createElement('div');
+    div.className = 'buyer-card';
+    div.onclick = () => window.location.href = `/buyer/${buyer.user_sid}`;
+
+    const displayName = buyer.custom_name || buyer.name || `Клиент ${buyer.user_sid}`;
+    const mobile = buyer.mobile ? String(buyer.mobile) : '';
+    const mobileFormatted = mobile ? `<span class="buyer-mobile">${formatPhone(mobile)}</span>` : '';
+
+    let avatarHtml;
+    if (buyer.custom_photo_path) {
+        avatarHtml = `<div class="buyer-avatar buyer-avatar-photo" style="background-image: url('/api/buyer-photo/${buyer.user_sid}')"></div>`;
+    } else {
+        avatarHtml = `<div class="buyer-avatar">${displayName.charAt(0).toUpperCase()}</div>`;
+    }
+
+    // Добавляем порядковый номер слева
+    const indexHtml = (typeof index !== 'undefined') ? `<div class="buyer-index">${index}</div>` : '';
+
+    div.innerHTML = `
+        ${indexHtml}
+        ${avatarHtml}
+        <div class="buyer-info">
+            <div class="buyer-name">${displayName}</div>
+            ${mobileFormatted}
+        </div>
+        ${buyer.cell ? `<div class="buyer-cell-badge"><span class="cell-number">${buyer.cell}</span></div>` : ''}
+    `;
+    return div;
+}
+
+function renderTryOnCards(buyers) {
+    buyersContainer.classList.add('tryon-mode');
+    tryOnGoodsCache.clear();
+    if (!buyers.length) {
+        buyersContainer.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">🧥</div>
+                <div class="empty-state-title">Сейчас никто не примеряет</div>
+                <div class="empty-state-text">Как только клиенты начнут примерку, они появятся здесь</div>
+            </div>
+        `;
+        return;
+    }
+    const fragment = document.createDocumentFragment();
+    buyers.forEach(buyer => fragment.appendChild(createTryOnCard(buyer)));
+    buyersContainer.innerHTML = '';
+    buyersContainer.appendChild(fragment);
+}
+
+function createTryOnCard(buyer) {
+    const card = document.createElement('div');
+    card.className = 'tryon-card';
+    if ((buyer.custom_description || '').trim()) {
+        card.classList.add('has-note');
+    }
+
+    const header = document.createElement('div');
+    header.className = 'tryon-card-header';
+
+    const avatarWrapper = document.createElement('div');
+    avatarWrapper.className = 'tryon-avatar-wrapper';
+
+    const avatar = document.createElement('div');
+    avatar.className = 'tryon-avatar';
+    if (buyer.custom_photo_path) {
+        avatar.classList.add('photo');
+        avatar.style.backgroundImage = `url('/api/buyer-photo/${buyer.user_sid}')`;
+    } else {
+        avatar.textContent = getBuyerInitial(buyer);
+    }
+    avatarWrapper.appendChild(avatar);
+
+    const avatarOverlay = document.createElement('div');
+    avatarOverlay.className = 'tryon-avatar-overlay';
+
+    const uploadBtn = document.createElement('button');
+    uploadBtn.type = 'button';
+    uploadBtn.className = 'tryon-avatar-overlay-btn';
+    uploadBtn.title = 'Изменить фото';
+    uploadBtn.innerHTML = '<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536M16.732 3.732a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>';
+    uploadBtn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        requestTryOnPhotoUpload(buyer, avatar);
+    });
+
+    const enlargeBtn = document.createElement('button');
+    enlargeBtn.type = 'button';
+    enlargeBtn.className = 'tryon-avatar-overlay-btn';
+    enlargeBtn.title = 'Увеличить фото';
+    enlargeBtn.innerHTML = '<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M5 11a6 6 0 1112 0 6 6 0 01-12 0z"/></svg>';
+    enlargeBtn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        openTryOnPhotoModal(buyer, avatar);
+    });
+
+    avatarOverlay.appendChild(uploadBtn);
+    avatarOverlay.appendChild(enlargeBtn);
+    avatarWrapper.appendChild(avatarOverlay);
+
+    const info = document.createElement('div');
+    info.className = 'tryon-card-main';
+
+    const nameEl = document.createElement('div');
+    nameEl.className = 'tryon-card-name';
+    nameEl.textContent = buyer.display_name || buyer.custom_name || buyer.name || 'Клиент';
+
+    const nameRow = document.createElement('div');
+    nameRow.className = 'tryon-name-row';
+    nameRow.appendChild(nameEl);
+
+    const editNameBtn = document.createElement('button');
+    editNameBtn.type = 'button';
+    editNameBtn.className = 'tryon-edit-btn';
+    editNameBtn.title = 'Изменить имя';
+    editNameBtn.innerHTML = '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536M16.732 3.732a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>';
+    editNameBtn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        promptTryOnNameEdit(buyer, nameEl, avatar);
+    });
+    nameRow.appendChild(editNameBtn);
+
+    const phoneEl = document.createElement('div');
+    phoneEl.className = 'tryon-card-phone';
+    if (buyer.mobile) {
+        phoneEl.innerHTML = formatPhone(buyer.mobile);
+    } else {
+        phoneEl.textContent = 'Телефон не указан';
+    }
+
+    const sinceEl = document.createElement('div');
+    sinceEl.className = 'tryon-card-since';
+    sinceEl.textContent = formatTryOnSince(buyer.try_on?.timestamp);
+
+    info.appendChild(nameRow);
+    info.appendChild(phoneEl);
+    info.appendChild(sinceEl);
+
+    const headerMeta = document.createElement('div');
+    headerMeta.className = 'tryon-header-meta';
+    const metaItems = [];
+    if (buyer.cell) {
+        metaItems.push({ label: 'Ячейка', value: buyer.cell, className: 'cell-meta' });
+    }
+    if (buyer.try_on?.order_id) {
+        metaItems.push({ label: 'Заказ', value: shortenOrderId(buyer.try_on.order_id) });
+    }
+    metaItems.forEach(item => headerMeta.appendChild(createInlineMetaBadge(item.label, item.value, item)));
+
+    const actions = document.createElement('div');
+    actions.className = 'tryon-card-actions';
+    const profileBtn = document.createElement('a');
+    profileBtn.className = 'btn btn-primary btn-sm';
+    profileBtn.href = `/buyer/${buyer.user_sid}`;
+    profileBtn.textContent = 'Полный профиль';
+    actions.appendChild(profileBtn);
+
+    const headerSide = document.createElement('div');
+    headerSide.className = 'tryon-header-side';
+    if (metaItems.length) {
+        headerSide.appendChild(headerMeta);
+    }
+    headerSide.appendChild(actions);
+
+    header.appendChild(avatarWrapper);
+    header.appendChild(info);
+    if (metaItems.length || actions.children.length) {
+        header.appendChild(headerSide);
+    }
+
+    const readyCount = typeof buyer.ready_goods_count === 'number' ? buyer.ready_goods_count : (buyer.goods_count || 0);
+
+    const goodsPanels = document.createElement('div');
+    goodsPanels.className = 'tryon-goods-panels';
+    goodsPanels.appendChild(createTryOnGoodsSection(buyer, 'ready', readyCount));
+    goodsPanels.appendChild(createTryOnGoodsSection(buyer, 'onway', buyer.goods_on_way_count || 0));
+
+    const notes = document.createElement('div');
+    notes.className = 'tryon-notes';
+
+    const notesHeader = document.createElement('div');
+    notesHeader.className = 'tryon-notes-header';
+    const notesTitle = document.createElement('span');
+    notesTitle.textContent = 'Заметки';
+    const notesStatus = document.createElement('span');
+    notesStatus.className = 'tryon-note-status';
+    notesStatus.dataset.noteStatus = buyer.user_sid;
+    notesStatus.textContent = 'Автосохранение';
+    notesHeader.appendChild(notesTitle);
+    notesHeader.appendChild(notesStatus);
+
+    const textarea = document.createElement('textarea');
+    textarea.className = 'tryon-note-input';
+    textarea.placeholder = 'Здесь фиксируем всё важное о примерке...';
+    textarea.value = buyer.custom_description || '';
+    textarea.dataset.buyer = buyer.user_sid;
+    textarea.addEventListener('input', () => scheduleTryOnNoteSave(buyer.user_sid, textarea));
+
+    notes.appendChild(notesHeader);
+    notes.appendChild(textarea);
+
+    card.appendChild(header);
+    card.appendChild(goodsPanels);
+    card.appendChild(notes);
+    return card;
+}
+
+function createInlineMetaBadge(label, value, options = {}) {
+    const wrap = document.createElement('div');
+    wrap.className = 'tryon-inline-meta';
+    if (options.className) {
+        wrap.classList.add(options.className);
+    }
+    const labelEl = document.createElement('span');
+    labelEl.className = 'label';
+    labelEl.textContent = label;
+    const valueEl = document.createElement('span');
+    valueEl.className = 'value';
+    valueEl.textContent = value;
+    wrap.appendChild(labelEl);
+    wrap.appendChild(valueEl);
+    return wrap;
+}
+
+function shortenOrderId(orderId) {
+    const str = String(orderId);
+    if (str.length <= 8) return str;
+    return `${str.slice(0, 4)}...${str.slice(-3)}`;
+}
+
+function createTryOnGoodsSection(buyer, type, count) {
+    const section = document.createElement('div');
+    section.className = 'tryon-goods-section';
+    section.dataset.type = type;
+    section.dataset.buyer = buyer.user_sid;
+
+    const header = document.createElement('div');
+    header.style.display = 'flex';
+    header.style.gap = '8px';
+    header.style.alignItems = 'center';
+    header.style.marginBottom = '8px';
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'tryon-goods-toggle';
+    button.style.flex = '1';
+    button.style.marginBottom = '0';
+
+    const label = type === 'ready' ? 'Готово к выдаче' : 'В пути';
+    button.innerHTML = `
+        <div class="tryon-goods-toggle-info">
+            <span class="label">${label}</span>
+            <span class="count">${count}</span>
+        </div>
+        <span class="chevron">▸</span>
+    `;
+    button.addEventListener('click', () => toggleTryOnGoodsSection(section, buyer, type));
+
+    const loadBtn = document.createElement('button');
+    loadBtn.type = 'button';
+    loadBtn.className = 'tryon-goods-action-btn';
+    loadBtn.title = 'Загрузить картинки категории';
+    loadBtn.innerHTML = '<svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>';
+
+    loadBtn.onclick = (e) => {
+        e.stopPropagation();
+        if (window.updateBuyerCategoryImages) {
+            window.updateBuyerCategoryImages(buyer.user_sid, type);
+        } else if (window.updateAllBuyerImages) {
+            window.updateAllBuyerImages(buyer.user_sid, type);
+        }
+    };
+
+    header.appendChild(button);
+    header.appendChild(loadBtn);
+
+    const list = document.createElement('div');
+    list.className = 'tryon-goods-list';
+
+    section.appendChild(header);
+    section.appendChild(list);
+    return section;
+}
+
+async function toggleTryOnGoodsSection(section, buyer, type) {
+    const isExpanded = section.classList.toggle('expanded');
+    const chevron = section.querySelector('.chevron');
+    if (chevron) {
+        chevron.textContent = isExpanded ? '▾' : '▸';
+    }
+    if (!isExpanded) {
+        return;
+    }
+    const list = section.querySelector('.tryon-goods-list');
+    const cacheKey = `${buyer.user_sid}:${type}`;
+    if (section.dataset.loaded === 'true' && tryOnGoodsCache.has(cacheKey)) {
+        renderTryOnGoodsList(list, tryOnGoodsCache.get(cacheKey), type);
+        return;
+    }
+    list.innerHTML = `<div class="tryon-goods-loading"><div class="loading-spinner"></div></div>`;
+    try {
+        const endpointType = type === 'ready' ? 'ready' : 'onway';
+        const data = await API.get(`/buyer/${buyer.user_sid}/goods?type=${endpointType}`);
+        const goods = data.goods || [];
+        tryOnGoodsCache.set(cacheKey, goods);
+        section.dataset.loaded = 'true';
+        renderTryOnGoodsList(list, goods, type);
+    } catch (err) {
+        console.error('Failed to load buyer goods', err);
+        list.innerHTML = `<div class="tryon-goods-error">Не удалось загрузить список</div>`;
+    }
+}
+
+function renderTryOnGoodsList(container, goods, type) {
+    container.innerHTML = '';
+    if (!goods.length) {
+        container.innerHTML = `<div class="tryon-goods-empty">${type === 'ready' ? 'Нет готовых товаров' : 'Нет посылок в пути'}</div>`;
+        return;
+    }
+    goods.forEach(good => {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'tryon-goods-item';
+
+        const thumb = document.createElement('div');
+        thumb.className = 'thumb tryon-goods-thumb';
+        const img = document.createElement('img');
+        const vendorCode = good.vendor_code || good.vendor_code_full || good.article || '';
+        const fallbackUrl = good.image_url || '';
+        img.alt = good.info?.name || 'Товар';
+        img.loading = 'lazy';
+        const resolvedThumb = (typeof getInitialImageSrc === 'function')
+            ? getInitialImageSrc(vendorCode, fallbackUrl)
+            : '/static/img/no-image.svg';
+        img.src = resolvedThumb || '/static/img/no-image.svg';
+        if (vendorCode) {
+            img.dataset.vendor = vendorCode;
+        }
+        if (fallbackUrl) {
+            img.dataset.fallback = fallbackUrl;
+        }
+        if (!resolvedThumb || resolvedThumb.includes('no-image')) {
+            img.classList.add('pending-image');
+        }
+        img.onerror = () => {
+            if (window.retryImage) {
+                window.retryImage(img);
+            } else {
+                img.src = '/static/img/no-image.svg';
+            }
+        };
+        thumb.appendChild(img);
+
+        const body = document.createElement('div');
+        body.className = 'info';
+        const title = document.createElement('div');
+        title.className = 'name';
+        title.textContent = good.info?.name || 'Товар';
+        const cellLine = document.createElement('div');
+        cellLine.className = 'meta';
+        cellLine.textContent = good.cell ? `Ячейка ${good.cell}` : (type === 'ready' ? 'Без ячейки' : '');
+        body.appendChild(title);
+        if (cellLine.textContent) {
+            body.appendChild(cellLine);
+        }
+        const code = document.createElement('div');
+        code.className = 'code';
+        const codeValue = good.scanned_code || good.sticker_code || '';
+        code.innerHTML = formatCodeWithLast4(codeValue);
+        body.appendChild(code);
+        item.appendChild(thumb);
+        item.appendChild(body);
+        item.addEventListener('click', (event) => {
+            event.stopPropagation();
+            openGoodsModal(good);
+        });
+        container.appendChild(item);
+    });
+    if (typeof hydrateVendorImages === 'function') {
+        hydrateVendorImages(container, '.tryon-goods-thumb img[data-vendor]', true, { defer: true });
+    }
+}
+
+function markTryOnRefreshCompleted() {
+    lastTryOnRefreshAt = new Date();
+    updateTryOnStatusTexts();
+}
+
+function updateTryOnStatusTexts() {
+    const lastEl = document.getElementById('try-on-last-refresh');
+    const nextEl = document.getElementById('try-on-next-refresh');
+    if (!lastEl || !nextEl) return;
+    if (lastTryOnRefreshAt) {
+        if (typeof formatDate === 'function') {
+            lastEl.textContent = `Обновлено ${formatDate(lastTryOnRefreshAt, { withSeconds: true })}`;
+        } else {
+            lastEl.textContent = `Обновлено ${formatShortTime(lastTryOnRefreshAt)}`;
+        }
+    } else {
+        lastEl.textContent = 'Данные ещё не загружены';
+    }
+    nextEl.textContent = TRY_ON_MANUAL_HINT;
+}
+
+function formatShortTime(date) {
+    if (!date) return '';
+    const d = date instanceof Date ? date : new Date(date);
+    return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+function formatTryOnSince(timestamp) {
+    if (!timestamp) return 'На примерке';
+    if (typeof formatDate === 'function') {
+        const formatted = formatDate(timestamp, { withSeconds: false });
+        return formatted ? `На примерке с ${formatted}` : 'На примерке';
+    }
+    const date = new Date(timestamp);
+    return `На примерке с ${date.toLocaleString('ru-RU')}`;
+}
+
+function formatCodeWithLast4(code) {
+    if (!code) return '—';
+    const str = String(code);
+    if (str.length <= 4) {
+        return `<span class="code-last">${escapeHtmlLite(str)}</span>`;
+    }
+    const base = str.slice(0, -4);
+    const last = str.slice(-4);
+    return `${escapeHtmlLite(base)}<span class="code-last">${escapeHtmlLite(last)}</span>`;
+}
+
+function escapeHtmlLite(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function getBuyerInitial(buyer) {
+    const source = buyer.display_name || buyer.custom_name || buyer.name || 'Клиент';
+    const trimmed = (source || '').trim();
+    return trimmed ? trimmed.charAt(0).toUpperCase() : 'К';
+}
+
+function promptTryOnNameEdit(buyer, nameEl, avatarEl) {
+    const currentName = nameEl.textContent.trim();
+    const newName = prompt('Введите имя клиента', currentName);
+    if (newName === null) return;
+    const normalized = newName.trim();
+    if (!normalized && !currentName) return;
+    if (normalized === currentName) return;
+    API.post(`/buyer/${buyer.user_sid}/update`, { custom_name: normalized })
+        .then(() => {
+            const finalName = normalized || 'Клиент';
+            nameEl.textContent = finalName;
+            buyer.custom_name = finalName;
+            buyer.display_name = finalName;
+            if (!buyer.custom_photo_path && avatarEl) {
+                avatarEl.textContent = getBuyerInitial(buyer);
+            }
+            Toast && Toast.success ? Toast.success('Имя обновлено') : null;
+        })
+        .catch(err => {
+            console.error('Failed to update name', err);
+            if (Toast && Toast.error) {
+                Toast.error('Не удалось сохранить имя');
+            }
+        });
+}
+
+let tryOnPhotoModalEl = null;
+let tryOnPhotoModalBuyer = null;
+
+function requestTryOnPhotoUpload(buyer, avatarEl) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.addEventListener('change', async (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        const formData = new FormData();
+        formData.append('photo', file);
+        try {
+            const response = await fetch(`/api/buyer/${buyer.user_sid}/photo`, {
+                method: 'POST',
+                body: formData
+            });
+            if (!response.ok) throw new Error('upload failed');
+            buyer.custom_photo_path = `/api/buyer-photo/${buyer.user_sid}`;
+            refreshTryOnAvatar(buyer, avatarEl);
+            updateTryOnPhotoModalContent(buyer);
+            if (Toast && Toast.success) {
+                Toast.success('Фото обновлено');
+            }
+        } catch (err) {
+            console.error('Failed to upload photo', err);
+            if (Toast && Toast.error) {
+                Toast.error('Ошибка загрузки фото');
+            }
+        }
+    });
+    input.click();
+}
+
+function refreshTryOnAvatar(buyer, avatarEl) {
+    if (!avatarEl) return;
+    const cacheBust = `?t=${Date.now()}`;
+    avatarEl.style.backgroundImage = `url('/api/buyer-photo/${buyer.user_sid}${cacheBust}')`;
+    avatarEl.classList.add('photo');
+    avatarEl.textContent = '';
+}
+
+function ensureTryOnPhotoModal() {
+    if (tryOnPhotoModalEl) return tryOnPhotoModalEl;
+    const overlay = document.createElement('div');
+    overlay.id = 'tryon-photo-modal';
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+        <div class="modal tryon-photo-modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Фото клиента</h3>
+                <button class="modal-close" type="button" aria-label="Закрыть">
+                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body tryon-photo-modal-body">
+                <div class="tryon-photo-modal-visual">
+                    <img class="tryon-photo-modal-image" src="" alt="Фото клиента">
+                    <div class="tryon-photo-modal-placeholder"></div>
+                </div>
+                <div class="tryon-photo-modal-actions">
+                    <button class="btn btn-secondary" type="button" data-action="upload">Заменить фото</button>
+                </div>
+            </div>
+        </div>
+    `;
+    overlay.addEventListener('click', (event) => {
+        if (event.target === overlay) {
+            closeModal('tryon-photo-modal');
+        }
+    });
+    overlay.querySelector('.modal-close').addEventListener('click', () => closeModal('tryon-photo-modal'));
+    overlay.querySelector('[data-action="upload"]').addEventListener('click', () => {
+        if (tryOnPhotoModalBuyer) {
+            requestTryOnPhotoUpload(tryOnPhotoModalBuyer.buyer, tryOnPhotoModalBuyer.avatarEl);
+        }
+    });
+    document.body.appendChild(overlay);
+    tryOnPhotoModalEl = overlay;
+    return overlay;
+}
+
+function openTryOnPhotoModal(buyer, avatarEl) {
+    const modal = ensureTryOnPhotoModal();
+    tryOnPhotoModalBuyer = { buyer, avatarEl };
+    updateTryOnPhotoModalContent(buyer);
+    openModal('tryon-photo-modal');
+}
+
+function updateTryOnPhotoModalContent(buyer) {
+    if (!tryOnPhotoModalEl) return;
+    const img = tryOnPhotoModalEl.querySelector('.tryon-photo-modal-image');
+    const placeholder = tryOnPhotoModalEl.querySelector('.tryon-photo-modal-placeholder');
+    if (buyer.custom_photo_path) {
+        const cacheBust = `?t=${Date.now()}`;
+        img.src = `/api/buyer-photo/${buyer.user_sid}${cacheBust}`;
+        img.style.display = 'block';
+        placeholder.style.display = 'none';
+    } else {
+        img.style.display = 'none';
+        placeholder.style.display = 'flex';
+        placeholder.textContent = getBuyerInitial(buyer);
+    }
+}
+
+function scheduleTryOnNoteSave(buyerSid, textarea) {
+    const statusEl = document.querySelector(`[data-note-status="${buyerSid}"]`);
+    if (statusEl) {
+        statusEl.textContent = 'Сохранение...';
+    }
+    if (tryOnNoteTimers.has(buyerSid)) {
+        clearTimeout(tryOnNoteTimers.get(buyerSid));
+    }
+    const timeout = setTimeout(async () => {
+        try {
+            await API.post(`/buyer/${buyerSid}/update`, { custom_description: textarea.value });
+            if (statusEl) {
+                statusEl.textContent = 'Сохранено';
+                setTimeout(() => {
+                    statusEl.textContent = 'Автосохранение';
+                }, 2000);
+            }
+        } catch (err) {
+            console.error('Failed to save note', err);
+            if (statusEl) {
+                statusEl.textContent = 'Ошибка';
+            }
+        }
+    }, 600);
+    tryOnNoteTimers.set(buyerSid, timeout);
+}
+
+// Бесконечная прокрутка
+const observer = new IntersectionObserver((entries) => {
+    if (entries[0].isIntersecting && buyersHasMore && !buyersLoading) {
+        loadMoreBuyers();
+    }
+}, { threshold: 0.1 });
+
+document.addEventListener('DOMContentLoaded', () => {
+    const trigger = document.getElementById('load-more-trigger');
+    if (trigger) {
+        observer.observe(trigger);
+    }
+    // Сначала инициализируем вкладки и фильтр
+    initializeTabsAndFilter();
+    // Затем явно запрашиваем первые данные по выставленному фильтру
+    resetAndLoadBuyers();
+    // Отключаем глобальный автозапуск загрузки клиентов из app.js
+    if (window.loadBuyers) {
+        window.loadBuyers = function() { /* отключено на buyers.html */ };
+    }
+});
+</script>
+{% endblock %}

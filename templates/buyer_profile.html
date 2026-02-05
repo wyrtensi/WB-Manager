@@ -1,0 +1,654 @@
+{% extends "base.html" %}
+
+{% block title %}{{ buyer.display_name }} - WB Manager{% endblock %}
+
+{% block content %}
+<!-- Профиль клиента -->
+<div class="section">
+    <div class="section-content">
+        <div class="profile-header-large">
+            <!-- Большое фото клиента (кликабельное для увеличения) -->
+            <div class="profile-photo-large" id="profile-avatar" onclick="openPhotoModal()">
+                {% if buyer.custom_photo_path %}
+                    <img src="/api/buyer-photo/{{ buyer.user_sid }}" alt="{{ buyer.display_name }}" id="buyer-photo">
+                {% else %}
+                    <div class="profile-photo-placeholder">
+                        {{ buyer.display_name[0] if buyer.display_name else '?' }}
+                    </div>
+                {% endif %}
+                <div class="profile-photo-edit" onclick="event.stopPropagation(); uploadPhoto()">
+                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    </svg>
+                    Изменить
+                </div>
+                <div class="profile-photo-zoom">🔍 Увеличить</div>
+            </div>
+            
+            <!-- Информация о клиенте -->
+            <div class="profile-info-large">
+                <div class="profile-name-row">
+                    <h1 class="profile-name-large" id="profile-name">{{ buyer.display_name }}</h1>
+                    <button class="btn btn-secondary btn-sm profile-edit-btn" type="button" onclick="editName()" title="Редактировать имя">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                        </svg>
+                    </button>
+                    <button class="btn btn-secondary btn-sm" onclick="updateAllBuyerImages('{{ buyer.user_sid }}')" title="Загрузить фото всех карточек товаров связанных с клиентом" style="margin-left: 8px;">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                        <span>Загрузить фото всех карточек товаров связанных с клиентом</span>
+                    </button>
+                </div>
+                
+                <div class="profile-sid">ID: {{ buyer.user_sid }}</div>
+                
+                <!-- Основная информация - крупно -->
+                <div class="profile-stats-grid">
+                    {% if buyer.mobile %}
+                    {% set raw_mobile = buyer.mobile|string %}
+                    {% set mobile_digits = raw_mobile|replace('+', '')|replace(' ', '')|replace('-', '')|replace('(', '')|replace(')', '') %}
+                    {% if mobile_digits|length == 10 and mobile_digits.startswith('9') %}
+                        {% set mobile_normalized = '7' ~ mobile_digits %}
+                    {% elif mobile_digits|length == 11 and mobile_digits.startswith('8') %}
+                        {% set mobile_normalized = '7' ~ mobile_digits[1:] %}
+                    {% else %}
+                        {% set mobile_normalized = mobile_digits %}
+                    {% endif %}
+                    {% set total_len = mobile_normalized|length %}
+                    {% set suffix_len = 4 if total_len >= 4 else total_len %}
+                    {% if total_len > 7 %}
+                        {% set prefix_len = 3 %}
+                    {% else %}
+                        {% set prefix_len = (total_len - suffix_len) if total_len > suffix_len else 0 %}
+                    {% endif %}
+                    {% set phone_first = mobile_normalized[:prefix_len] %}
+                    {% set phone_last = mobile_normalized[-suffix_len:] if suffix_len > 0 else '' %}
+                    {% set has_hidden = total_len > (prefix_len + suffix_len) %}
+                    {% set phone_base = '+' ~ phone_first ~ (has_hidden and 'xxxx' or '') %}
+                    {% endif %}
+                    <div class="profile-stat-card">
+                        <div class="profile-stat-icon">📱</div>
+                        <div class="profile-stat-content">
+                            <div class="profile-stat-label">Телефон</div>
+                            <div class="profile-stat-value phone">
+                                {% if buyer.mobile %}
+                                    {{ phone_base }}{% if phone_last %}<span class="phone-highlight">{{ phone_last }}</span>{% endif %}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {% if buyer.cell %}
+                    <div class="profile-stat-card cell-card">
+                        <div class="profile-stat-icon">📦</div>
+                        <div class="profile-stat-content">
+                            <div class="profile-stat-label">Ячейка</div>
+                            <div class="profile-stat-value cell-number">{{ buyer.cell }}</div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="profile-stat-card">
+                        <div class="profile-stat-icon">🛒</div>
+                        <div class="profile-stat-content">
+                            <div class="profile-stat-label">Товаров на ПВЗ</div>
+                            <div class="profile-stat-value">{{ buyer.goods_count }}</div>
+                        </div>
+                    </div>
+                    
+                    <div class="profile-stat-card">
+                        <div class="profile-stat-icon">🚚</div>
+                        <div class="profile-stat-content">
+                            <div class="profile-stat-label">В пути</div>
+                            <div class="profile-stat-value">{{ goods_onway|length }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Общая заметка -->
+        <div class="profile-shared-note">
+            <div class="profile-shared-note-header">
+                <div>
+                    <div class="profile-shared-note-title">Заметка о клиенте</div>
+                    <div class="profile-shared-note-subtitle">Отображается и в мини-профиле примерки</div>
+                </div>
+                <span class="profile-shared-note-status" id="buyer-note-status">Автосохранение</span>
+            </div>
+            <textarea id="buyer-note-shared" class="profile-shared-note-input" rows="4" placeholder="Запишите сюда всё важное...">{{ (buyer.custom_description or '')|e }}</textarea>
+        </div>
+    </div>
+</div>
+
+<!-- Табы: товары на ПВЗ / в пути / история / все -->
+<div class="tabs">
+    <button class="tab active" data-tab="pickup">Готовы к выдаче ({{ goods_pickup|length }})</button>
+    <button class="tab" data-tab="onway">В пути ({{ goods_onway|length }})</button>
+    <button class="tab" data-tab="history">История заказов</button>
+    <button class="tab" data-tab="all">Все товары</button>
+</div>
+
+<!-- Товары готовые к выдаче (GOODS_READY) -->
+<div id="tab-pickup" class="tab-content">
+    <div class="goods-grid">
+        {% if goods_pickup %}
+            {% for g in goods_pickup %}
+            <div class="goods-card profile-goods-card" onclick='openGoodsModal({{ g|tojson|safe }})'>
+                <div class="goods-image-wrapper profile-goods-card__media">
+                    <img class="goods-image pending-image" src="/static/img/no-image.svg" 
+                        data-vendor="{{ (g.vendor_code or '')|e }}" data-fallback="{{ (g.image_url or '')|e }}" loading="lazy"
+                         onerror="if(window.retryImage) window.retryImage(this); else this.src='/static/img/no-image.svg';" alt="">
+                    <span class="goods-chip goods-chip--overlay status-ready">Готов к выдаче</span>
+                    <span class="goods-chip goods-chip--overlay goods-chip--cell">🗄️ {{ g.cell or '-' }}</span>
+                    <button class="goods-image-refresh" data-vendor="{{ (g.vendor_code or '')|e }}" onclick="refreshGoodsImage(event, this.dataset.vendor)" title="Загрузить картинку">
+                        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    </button>
+                </div>
+                <div class="goods-info profile-goods-card__body">
+                    <div class="goods-info-header">
+                        <div class="goods-brand">
+                            {{ g.info.brand if g.info else '' }}
+                            {% if g.info and g.info.adult %}
+                                <span class="goods-tag adult" style="font-size: 10px; padding: 1px 4px; margin-left: 4px;">18+</span>
+                            {% endif %}
+                        </div>
+                        <div class="goods-name">{{ g.info.name if g.info else 'Товар' }}</div>
+                    </div>
+                    <div class="goods-pill-row">
+                        {% set primary_code = g.scanned_code or g.sticker_code or '' %}
+                        {% set code_prefix = primary_code[:-4] if primary_code|length > 4 else '' %}
+                        {% set code_suffix = primary_code[-4:] if primary_code else '—' %}
+                        <button type="button" class="goods-pill copy-pill" data-code="{{ primary_code|e }}" onclick="event.stopPropagation(); copyToClipboard(this.dataset.code, this)">
+                            <span>ШК</span>
+                            <strong class="goods-pill-code">
+                                {% if code_prefix %}<span>{{ code_prefix }}</span>{% endif %}
+                                <span class="goods-pill-highlight">{{ code_suffix }}</span>
+                            </strong>
+                        </button>
+                    </div>
+                    {% set price_sale = g.price_with_sale or g.price or 0 %}
+                    {% set price_orig = g.price or 0 %}
+                    <div class="goods-price-row profile">
+                        {% if price_orig > price_sale and price_sale > 0 %}
+                            <span class="goods-price-original">{{ price_orig }} ₽</span>
+                            <span class="goods-price-sale">{{ price_sale }} ₽</span>
+                        {% else %}
+                            <span class="goods-price">{{ price_sale }} ₽</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty-state" style="grid-column: 1/-1;">
+                <div class="empty-state-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                <div class="empty-state-title">Нет товаров к выдаче</div>
+                <div class="empty-state-text">Все товары клиента выданы</div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Товары в пути -->
+<div id="tab-onway" class="tab-content" style="display: none;">
+    <div class="goods-grid">
+        {% if goods_onway %}
+            {% for g in goods_onway %}
+                    <div class="goods-card profile-goods-card" onclick='openGoodsModal({{ g|tojson|safe }})'>
+                <div class="goods-image-wrapper profile-goods-card__media">
+                    <img class="goods-image pending-image" src="/static/img/no-image.svg" 
+                        data-vendor="{{ (g.vendor_code or '')|e }}" data-fallback="{{ (g.image_url or '')|e }}" loading="lazy"
+                         onerror="if(window.retryImage) window.retryImage(this); else this.src='/static/img/no-image.svg';" alt="">
+                    <span class="goods-chip goods-chip--overlay status-onway">🚚 В пути</span>
+                    <button class="goods-image-refresh" data-vendor="{{ (g.vendor_code or '')|e }}" onclick="refreshGoodsImage(event, this.dataset.vendor)" title="Загрузить картинку">
+                        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    </button>
+                </div>
+                <div class="goods-info profile-goods-card__body">
+                    <div class="goods-info-header">
+                        <div class="goods-brand">
+                            {{ g.info.brand if g.info else '' }}
+                            {% if g.info and g.info.adult %}
+                                <span class="goods-tag adult" style="font-size: 10px; padding: 1px 4px; margin-left: 4px;">18+</span>
+                            {% endif %}
+                        </div>
+                        <div class="goods-name">{{ g.info.name if g.info else 'Товар' }}</div>
+                    </div>
+                    <div class="goods-pill-row">
+                        {% set primary_code = g.sticker_code or g.scanned_code or '' %}
+                        {% set code_prefix = primary_code[:-4] if primary_code|length > 4 else '' %}
+                        {% set code_suffix = primary_code[-4:] if primary_code else '—' %}
+                        <button type="button" class="goods-pill copy-pill" data-code="{{ primary_code|e }}" onclick="event.stopPropagation(); copyToClipboard(this.dataset.code, this)">
+                            <span>ШК</span>
+                            <strong class="goods-pill-code">
+                                {% if code_prefix %}<span>{{ code_prefix }}</span>{% endif %}
+                                <span class="goods-pill-highlight">{{ code_suffix }}</span>
+                            </strong>
+                        </button>
+                    </div>
+                    {% if g.cell %}
+                    <div class="goods-chip goods-chip--muted">Планируемая полка: {{ g.cell }}</div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty-state" style="grid-column: 1/-1;">
+                <div class="empty-state-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
+                    </svg>
+                </div>
+                <div class="empty-state-title">Нет товаров в пути</div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- История заказов (сгруппированная) -->
+<div id="tab-history" class="tab-content" style="display: none;">
+    <div id="history-orders-container">
+        <!-- Заполняется через JS -->
+    </div>
+</div>
+
+<!-- Все товары (без фильтров) -->
+<div id="tab-all" class="tab-content" style="display: none;">
+    <div class="goods-grid">
+        {% if goods_all %}
+            {% for g in goods_all %}
+            {% set status_label = 'Получен' %}
+            {% set status_class = 'status-received' %}
+            {% if g.status == 'GOODS_READY' %}
+                {% set status_label = 'Готов к выдаче' %}
+                {% set status_class = 'status-ready' %}
+            {% elif g.status == 'GOODS_DECLINED' %}
+                {% set status_label = 'Отклонён' %}
+                {% set status_class = 'status-declined' %}
+            {% elif g.status in ['GOODS_ON_WAY', 'GOODS_IN_TRANSIT'] %}
+                {% set status_label = 'В пути' %}
+                {% set status_class = 'status-onway' %}
+            {% endif %}
+            <div class="goods-card profile-goods-card" onclick='openGoodsModal({{ g|tojson|safe }})'>
+                <div class="goods-image-wrapper profile-goods-card__media">
+                    <img class="goods-image pending-image" src="/static/img/no-image.svg" 
+                        data-vendor="{{ (g.vendor_code or '')|e }}" data-fallback="{{ (g.image_url or '')|e }}" loading="lazy"
+                         onerror="if(window.retryImage) window.retryImage(this); else this.src='/static/img/no-image.svg';" alt="">
+                    <span class="goods-chip goods-chip--overlay {{ status_class }}">{{ status_label }}</span>
+                    {% if g.cell %}<span class="goods-chip goods-chip--overlay goods-chip--cell">🗄️ {{ g.cell }}</span>{% endif %}
+                    <button class="goods-image-refresh" data-vendor="{{ (g.vendor_code or '')|e }}" onclick="refreshGoodsImage(event, this.dataset.vendor)" title="Загрузить картинку">
+                        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    </button>
+                </div>
+                <div class="goods-info profile-goods-card__body">
+                    <div class="goods-info-header">
+                        <div class="goods-brand">
+                            {{ g.info.brand if g.info else '' }}
+                            {% if g.info and g.info.adult %}
+                                <span class="goods-tag adult" style="font-size: 10px; padding: 1px 4px; margin-left: 4px;">18+</span>
+                            {% endif %}
+                        </div>
+                        <div class="goods-name">{{ g.info.name if g.info else 'Товар' }}</div>
+                    </div>
+                    <div class="goods-pill-row">
+                        {% set primary_code = g.scanned_code or g.sticker_code or '' %}
+                        {% set code_prefix = primary_code[:-4] if primary_code|length > 4 else '' %}
+                        {% set code_suffix = primary_code[-4:] if primary_code else '—' %}
+                        <button type="button" class="goods-pill copy-pill" data-code="{{ primary_code|e }}" onclick="event.stopPropagation(); copyToClipboard(this.dataset.code, this)">
+                            <span>ШК</span>
+                            <strong class="goods-pill-code">
+                                {% if code_prefix %}<span>{{ code_prefix }}</span>{% endif %}
+                                <span class="goods-pill-highlight">{{ code_suffix }}</span>
+                            </strong>
+                        </button>
+                    </div>
+                    {% set price_sale = g.price_with_sale or g.price or 0 %}
+                    {% set price_orig = g.price or 0 %}
+                    <div class="goods-price-row profile">
+                        {% if price_orig > price_sale and price_sale > 0 %}
+                            <span class="goods-price-original">{{ price_orig }} ₽</span>
+                            <span class="goods-price-sale">{{ price_sale }} ₽</span>
+                        {% else %}
+                            <span class="goods-price">{{ price_sale }} ₽</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty-state" style="grid-column: 1/-1;">
+                <div class="empty-state-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                    </svg>
+                </div>
+                <div class="empty-state-title">Нет товаров</div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Модальное окно для увеличенного фото -->
+<div id="photo-modal" class="modal-overlay" onclick="closePhotoModal()">
+    <div class="photo-modal-content" onclick="event.stopPropagation()">
+        <button class="modal-close" onclick="closePhotoModal()">
+            <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+        </button>
+        <img src="" alt="Фото клиента" id="photo-modal-image">
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script type="application/json" id="buyer-delivered-data">{{ delivered|tojson|safe }}</script>
+<script>
+const buyerSid = "{{ buyer.user_sid }}";
+const deliveredData = (() => {
+    const payload = document.getElementById('buyer-delivered-data');
+    if (!payload) {
+        return [];
+    }
+    try {
+        return JSON.parse(payload.textContent || '[]');
+    } catch (err) {
+        console.error('Failed to parse delivered goods payload', err);
+        return [];
+    }
+})();
+let buyerNoteSaveTimer = null;
+
+function getProfileImageSrc(vendorCode, fallbackUrl) {
+    if (typeof resolveImageUrl === 'function') {
+        return resolveImageUrl(vendorCode, fallbackUrl);
+    }
+    if (fallbackUrl && !fallbackUrl.includes('no-image')) {
+        return fallbackUrl;
+    }
+    return '/static/img/no-image.svg';
+}
+
+// Инициализация
+document.addEventListener('DOMContentLoaded', () => {
+    initBuyerSharedNote();
+    renderGroupedHistory();
+    if (typeof initTabs === 'function') {
+        initTabs();
+    } else {
+        initProfileTabsFallback();
+    }
+});
+
+function initProfileTabsFallback() {
+    const tabs = document.querySelectorAll('.tabs .tab');
+    const contents = document.querySelectorAll('.tab-content');
+    tabs.forEach(tab => {
+        tab.addEventListener('click', function() {
+            tabs.forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+            requestAnimationFrame(() => {
+                contents.forEach(c => { c.style.display = 'none'; });
+                const target = document.getElementById('tab-' + this.dataset.tab);
+                if (target) {
+                    target.style.display = 'block';
+                    if (typeof scheduleTabHydration === 'function') {
+                        scheduleTabHydration(this.dataset.tab);
+                    }
+                }
+            });
+        });
+    });
+    const initial = document.querySelector('.tabs .tab.active');
+    if (initial && typeof scheduleTabHydration === 'function' && initial.dataset.tab) {
+        scheduleTabHydration(initial.dataset.tab);
+    }
+}
+
+// Группировка истории заказов
+function renderGroupedHistory() {
+    const container = document.getElementById('history-orders-container');
+    if (!deliveredData || deliveredData.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                    </svg>
+                </div>
+                <div class="empty-state-title">История пуста</div>
+                <div class="empty-state-text">Выданные заказы клиента появятся здесь</div>
+            </div>
+        `;
+        return;
+    }
+    
+    // Группируем по order_id или по времени выдачи (с точностью до минуты)
+    const grouped = {};
+    deliveredData.forEach(item => {
+        let orderId;
+        
+        if (item.order_id) {
+            orderId = String(item.order_id);
+        } else {
+            // Группируем по времени выдачи (с точностью до минуты)
+            const timeKey = item.delivery_timestamp ? Math.floor(item.delivery_timestamp / 60000) : 0;
+            orderId = `order_${timeKey}`;
+        }
+        
+        orderId = orderId || 'unknown';
+        if (!grouped[orderId]) {
+            grouped[orderId] = {
+                items: [],
+                total: 0,
+                timestamp: item.delivery_timestamp
+            };
+        }
+        grouped[orderId].items.push(item);
+        grouped[orderId].total += (item.price_with_sale || item.price || 0);
+    });
+    
+    // Рендерим
+    const historyHtml = Object.entries(grouped).map(([orderId, data]) => {
+        const itemsHtml = data.items.map(item => {
+            const vendorCode = item.vendor_code ? String(item.vendor_code) : '';
+            const imgSrc = getProfileImageSrc(vendorCode, item.image_url);
+            const itemData = JSON.stringify(item).replace(/"/g, '&quot;');
+            return `
+                <div class="order-item-mini" onclick="openDeliveredItemModal(${itemData})" style="cursor: pointer;">
+                    <img src="${imgSrc}" data-vendor="${vendorCode}" alt="" loading="lazy"
+                         onerror="if(window.retryImage) window.retryImage(this); else this.src='/static/img/no-image.svg';">
+                    <div class="order-item-info">
+                        <div class="order-item-name">${item.info?.name || 'Товар'}</div>
+                        <div class="order-item-barcode" onclick="event.stopPropagation(); copyToClipboard('${item.scanned_code}')">${item.scanned_code || '-'}</div>
+                    </div>
+                    <div class="order-item-price">${formatPrice(item.price_with_sale || item.price)}</div>
+                </div>
+            `;
+        }).join('');
+        const issuedAt = formatTimestamp(data.timestamp);
+        return `
+            <div class="order-group">
+                <div class="order-group-header">
+                    <div class="order-id">Заказ #${orderId.substring(0, 8)}...</div>
+                    <div class="order-count">${data.items.length} товар${getPlural(data.items.length)}</div>
+                    <div class="order-total">${formatPrice(data.total)}</div>
+                    <div class="order-date">${issuedAt ? `Выдан ${issuedAt}` : ''}</div>
+                </div>
+                <div class="order-items">
+                    ${itemsHtml}
+                </div>
+            </div>
+        `;
+    }).join('');
+    container.innerHTML = historyHtml;
+    if (typeof hydrateVendorImages === 'function') {
+        hydrateVendorImages(container, '.order-item-mini img[data-vendor]', false, { defer: true });
+    }
+}
+
+// Открытие модального окна для товара из истории
+function openDeliveredItemModal(item) {
+    // Преобразуем данные выданного товара в формат для openGoodsModal
+    const goods = {
+        scanned_code: item.scanned_code,
+        vendor_code: item.vendor_code,
+        info: item.info || {},
+        price: item.price,
+        price_with_sale: item.price_with_sale,
+        buyer_sid: buyerSid,
+        status: 'GOODS_RECIEVED', // Выдан
+        image_url: item.image_url,
+        goods_uid: item.goods_uid
+    };
+    
+    // Открываем стандартную модалку товара
+    if (window.openGoodsModal) {
+        window.openGoodsModal(goods);
+    }
+}
+
+function getPlural(n) {
+    if (n === 1) return '';
+    if (n >= 2 && n <= 4) return 'а';
+    return 'ов';
+}
+
+function formatPrice(price) {
+    if (!price) return '0 ₽';
+    return price + ' ₽';
+}
+
+function formatTimestamp(ts) {
+    if (!ts) return '';
+    if (typeof window.formatDate === 'function') {
+        return formatDate(ts, { verbose: true, withSeconds: true }) || '';
+    }
+    const date = new Date(ts);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+    return `${day}.${month}.${year} ${hours}:${minutes}:${seconds}`;
+}
+
+// Общая заметка с автосохранением
+function initBuyerSharedNote() {
+    const textarea = document.getElementById('buyer-note-shared');
+    const statusEl = document.getElementById('buyer-note-status');
+    if (!textarea) return;
+    textarea.addEventListener('input', () => scheduleBuyerSharedNoteSave(textarea, statusEl));
+}
+
+function scheduleBuyerSharedNoteSave(textarea, statusEl) {
+    if (!textarea) return;
+    if (statusEl) {
+        statusEl.textContent = 'Сохранение...';
+    }
+    if (buyerNoteSaveTimer) {
+        clearTimeout(buyerNoteSaveTimer);
+    }
+    buyerNoteSaveTimer = setTimeout(async () => {
+        try {
+            await fetch(`/api/buyer/${buyerSid}/update`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ custom_description: textarea.value })
+            });
+            if (statusEl) {
+                statusEl.textContent = 'Сохранено';
+                setTimeout(() => statusEl.textContent = 'Автосохранение', 2000);
+            }
+        } catch (err) {
+            console.error('Failed to save buyer note', err);
+            if (statusEl) {
+                statusEl.textContent = 'Ошибка';
+            }
+        }
+    }, 600);
+}
+
+// Редактирование имени
+async function editName() {
+    const currentName = document.getElementById('profile-name').textContent.trim();
+    const newName = prompt('Введите имя клиента:', currentName);
+    if (newName === null || newName === currentName) return;
+    
+    try {
+        const response = await fetch(`/api/buyer/${buyerSid}/update`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ custom_name: newName })
+        });
+        
+        if (response.ok) {
+            document.getElementById('profile-name').textContent = newName || 'Клиент';
+            Toast.success('Имя обновлено');
+        } else {
+            Toast.error('Ошибка сохранения');
+        }
+    } catch (err) {
+        Toast.error('Ошибка сохранения');
+    }
+}
+
+// Загрузка фото
+function uploadPhoto() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        const formData = new FormData();
+        formData.append('photo', file);
+        
+        try {
+            const response = await fetch(`/api/buyer/${buyerSid}/photo`, {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (response.ok) {
+                location.reload();
+            } else {
+                Toast.error('Ошибка загрузки фото');
+            }
+        } catch (err) {
+            Toast.error('Ошибка загрузки');
+        }
+    };
+    input.click();
+}
+
+// Увеличение фото
+function openPhotoModal() {
+    const img = document.getElementById('buyer-photo');
+    if (!img) return;
+    
+    const modal = document.getElementById('photo-modal');
+    const modalImg = document.getElementById('photo-modal-image');
+    modalImg.src = img.src;
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+function closePhotoModal() {
+    const modal = document.getElementById('photo-modal');
+    modal.classList.remove('active');
+    document.body.style.overflow = '';
+}
+
+</script>
+{% endblock %}

@@ -1,0 +1,979 @@
+{% extends "base.html" %}
+
+{% block title %}Озвучка - WB Manager{% endblock %}
+
+{% block extra_css %}
+<style>
+    .voiceover-container {
+        padding: 20px;
+        max-width: 1400px;
+        margin: 0 auto;
+        display: flex;
+        gap: 20px;
+        height: calc(100vh - 40px);
+    }
+
+    /* Sidebar */
+    .voiceover-sidebar {
+        width: 250px;
+        background: rgba(255,255,255,0.03);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 15px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        flex-shrink: 0;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .voiceover-sidebar:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 25px rgba(0,0,0,0.25);
+    }
+
+    .sidebar-title {
+        font-size: 1.1rem;
+        font-weight: 700;
+        margin-bottom: 10px;
+        color: var(--text-primary);
+        padding-left: 10px;
+    }
+
+    .category-btn {
+        padding: 12px 15px;
+        border-radius: 8px;
+        background: transparent;
+        border: none;
+        color: var(--text-secondary);
+        text-align: left;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-weight: 500;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border: 1px solid transparent;
+    }
+
+    .category-btn:hover {
+        background: rgba(255,255,255,0.05);
+        color: var(--text-primary);
+        border-color: var(--border-color);
+        transform: translateX(2px);
+    }
+
+    .category-btn.active {
+        background: var(--primary-color);
+        color: white;
+        border-color: var(--primary-color);
+        box-shadow: 0 0 10px rgba(59, 130, 246, 0.3);
+    }
+
+    .category-badge {
+        background: rgba(255,255,255,0.2);
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-size: 0.8rem;
+    }
+
+    .category-btn:not(.active) .category-badge {
+        background: var(--bg-secondary);
+        color: var(--text-secondary);
+    }
+
+    /* Main Content */
+    .voiceover-main {
+        flex: 1;
+        background: rgba(255,255,255,0.03);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .voiceover-main:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 25px rgba(0,0,0,0.25);
+    }
+
+    .main-header {
+        padding: 20px;
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .search-box {
+        position: relative;
+        width: 300px;
+    }
+
+    .search-input {
+        width: 100%;
+        padding: 10px 15px 10px 35px;
+        border-radius: 8px;
+        border: 1px solid var(--border-color);
+        background: var(--bg-primary);
+        color: var(--text-primary);
+    }
+
+    .search-icon {
+        position: absolute;
+        left: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-secondary);
+    }
+
+    /* Table List */
+    .sound-list-container {
+        flex: 1;
+        overflow-y: auto;
+        padding: 0;
+    }
+
+    .sound-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .sound-table th {
+        text-align: left;
+        padding: 15px 20px;
+        border-bottom: 1px solid var(--border-color);
+        color: var(--text-secondary);
+        font-weight: 600;
+        position: sticky;
+        top: 0;
+        background: var(--card-bg);
+        z-index: 10;
+    }
+
+    .sound-table td {
+        padding: 12px 20px;
+        border-bottom: 1px solid var(--border-color);
+        color: var(--text-primary);
+        vertical-align: middle;
+    }
+
+    .sound-table tr:hover {
+        background: rgba(255,255,255,0.05);
+        transform: scale(1.01);
+        transition: all 0.2s ease;
+    }
+
+    .col-play { width: 50px; }
+    .col-name { width: 40%; }
+    .col-file { width: 30%; color: var(--text-secondary); font-family: monospace; font-size: 0.9rem; }
+    .col-actions { width: 150px; text-align: right; }
+
+    .btn-play {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: var(--primary-color);
+        border: none;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: transform 0.1s;
+    }
+
+    .btn-play:hover {
+        transform: scale(1.1);
+    }
+
+    .btn-action {
+        padding: 6px 12px;
+        border-radius: 6px;
+        border: 1px solid var(--border-color);
+        background: transparent;
+        color: var(--text-primary);
+        cursor: pointer;
+        font-size: 0.9rem;
+        margin-left: 5px;
+    }
+
+    .btn-action:hover {
+        background: var(--bg-secondary);
+        border-color: var(--text-secondary);
+    }
+
+    .name-edit-input {
+        background: transparent;
+        border: 1px solid transparent;
+        color: var(--text-primary);
+        padding: 5px;
+        border-radius: 4px;
+        width: 100%;
+        font-family: inherit;
+        font-size: inherit;
+    }
+
+    .name-edit-input:focus {
+        border-color: var(--primary-color);
+        background: var(--bg-primary);
+        outline: none;
+    }
+
+    .name-edit-input:hover:not(:focus) {
+        border-color: var(--border-color);
+    }
+
+    /* TTS Inline Editor */
+    .tts-inline-row {
+        background: var(--bg-secondary);
+        animation: slideDown 0.2s ease-out;
+    }
+    
+    .tts-inline-editor {
+        padding: 20px;
+        border-left: 4px solid var(--primary-color);
+        display: grid;
+        grid-template-columns: 1fr 300px;
+        gap: 20px;
+    }
+
+    @media (max-width: 1000px) {
+        .tts-inline-editor {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @keyframes slideDown {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Form Controls */
+    .tts-textarea, .control-input {
+        width: 100%;
+        background: var(--bg-primary);
+        border: 1px solid var(--border-color);
+        color: var(--text-primary);
+        border-radius: 6px;
+        padding: 8px;
+        font-family: inherit;
+        font-size: 0.9rem;
+    }
+
+    .tts-textarea:focus, .control-input:focus {
+        border-color: var(--primary-color);
+        outline: none;
+    }
+
+    .control-label {
+        display: block;
+        margin-bottom: 5px;
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+    }
+
+    /* Patcher Sidebar Area */
+    .patcher-area {
+        margin-top: auto;
+        padding-top: 15px;
+        border-top: 1px solid var(--border-color);
+    }
+
+    .patcher-confirm {
+        display: none;
+        flex-direction: column;
+        gap: 10px;
+        animation: fadeIn 0.3s ease;
+    }
+
+    .patcher-status {
+        font-size: 0.85rem;
+        margin-top: 10px;
+        line-height: 1.4;
+        padding: 8px;
+        border-radius: 6px;
+        background: var(--bg-primary);
+        display: none;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(5px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Modal Styles */
+    .modal {
+        position: fixed;
+        z-index: 9999;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: 100vw;
+        height: 100vh;
+        background-color: rgba(0, 0, 0, 0.75);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        backdrop-filter: blur(4px);
+    }
+
+    .modal.show {
+        display: flex;
+        animation: modalFadeIn 0.3s ease;
+    }
+
+    @keyframes modalFadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    .modal-content {
+        background: #1f2437;
+        padding: 40px;
+        border: 1px solid #3a3f52;
+        border-radius: 16px;
+        width: 90%;
+        max-width: 500px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+        color: #e5e7eb;
+        text-align: center;
+        animation: modalSlideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        position: relative;
+    }
+
+    @keyframes modalSlideIn {
+        from {
+            opacity: 0;
+            transform: translateY(-30px) scale(0.95);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+
+    .modal-content h3 {
+        margin: 0 0 20px 0;
+        color: #60a5fa;
+        font-size: 1.6rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+    }
+
+    .modal-content h3::before {
+        content: "✓";
+        display: inline-block;
+        width: 36px;
+        height: 36px;
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        border-radius: 50%;
+        line-height: 36px;
+        font-size: 1.2rem;
+    }
+
+    .modal-content p {
+        line-height: 1.8;
+        margin-bottom: 30px;
+        font-size: 1.05rem;
+        color: #cbd5e1;
+    }
+
+    .modal-close {
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        color: white;
+        border: none;
+        padding: 14px 32px;
+        border-radius: 10px;
+        cursor: pointer;
+        font-size: 1.05rem;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+    }
+
+    .modal-close:hover {
+        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5);
+    }
+
+    .modal-close:active {
+        transform: translateY(0);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="voiceover-container">
+    <!-- Sidebar -->
+    <aside class="voiceover-sidebar">
+        <div class="sidebar-title">Категории</div>
+        <button class="category-btn active" data-category="all">
+            <span>Все звуки</span>
+            <span class="category-badge" id="badge-all">0</span>
+        </button>
+        <button class="category-btn" data-category="system">
+            <span>Системные</span>
+            <span class="category-badge" id="badge-system">0</span>
+        </button>
+        <button class="category-btn" data-category="woman">
+            <span>Основная (Woman)</span>
+            <span class="category-badge" id="badge-woman">0</span>
+        </button>
+        <button class="category-btn" data-category="cells">
+            <span>Ячейки (Cells)</span>
+            <span class="category-badge" id="badge-cells">0</span>
+        </button>
+
+        <div class="patcher-area">
+            <button class="btn btn-primary" style="width: 100%;" id="btn-open-patcher">
+                🔄 Патчер
+            </button>
+            
+            <div id="patcher-confirm" class="patcher-confirm">
+                <div id="patcher-question" style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 5px; text-align: center;">
+                    Обновить звуки в программе WB PVZ?
+                </div>
+                <div id="patcher-buttons" style="display: flex; flex-direction: column; margin-bottom: 4px;">
+                    <button class="btn btn-success" id="btn-run-patcher" style="width: 100%; margin-bottom: 14px;">Да, обновить</button>
+                    <button class="btn btn-secondary" id="btn-cancel-patcher" style="width: 100%;">Отмена</button>
+                </div>
+                <div id="patcher-status" class="patcher-status" style="display:none;"></div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="voiceover-main">
+        <div class="main-header">
+            <h2 id="current-category-title">Все звуки</h2>
+            <div class="search-box">
+                <span class="search-icon">🔍</span>
+                <input type="text" class="search-input" id="search-input" placeholder="Поиск звука...">
+            </div>
+        </div>
+
+        <div class="sound-list-container">
+            <table class="sound-table">
+                <thead>
+                    <tr>
+                        <th class="col-play"></th>
+                        <th class="col-name">Название (в интерфейсе)</th>
+                        <th class="col-file">Файл</th>
+                        <th class="col-actions">Действия</th>
+                    </tr>
+                </thead>
+                <tbody id="sound-table-body">
+                    <!-- Rows will be injected here -->
+                </tbody>
+            </table>
+        </div>
+    </main>
+</div>
+
+<!-- TTS Template -->
+<template id="tts-template">
+    <tr class="tts-inline-row" id="tts-editor-row">
+        <td colspan="4">
+            <div class="tts-inline-editor">
+                <div style="display: flex; flex-direction: column; gap: 15px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div class="control-label">Файл: <span id="tts-filename" style="color: var(--primary-color); font-weight: 500;"></span></div>
+                    </div>
+                    
+                    <div class="control-group" style="flex: 1; display: flex; flex-direction: column;">
+                        <label class="control-label">Текст</label>
+                        <textarea id="tts-text" class="tts-textarea" style="flex: 1; min-height: 120px;" placeholder="Введите текст..."></textarea>
+                    </div>
+                </div>
+
+                <div class="tts-controls" style="display: flex; flex-direction: column; gap: 15px;">
+                    <div class="control-group">
+                        <label class="control-label">Голос</label>
+                        <select id="tts-voice" class="control-input">
+                            <option value="ru-RU-DmitryNeural" selected>ru-RU-DmitryNeural (Мужской)</option>
+                            <option value="ru-RU-SvetlanaNeural">ru-RU-SvetlanaNeural (Женский)</option>
+                        </select>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div class="control-group">
+                            <label class="control-label">Скорость</label>
+                            <input type="text" id="tts-rate" class="control-input" value="+5%">
+                        </div>
+                        <div class="control-group">
+                            <label class="control-label">Тон</label>
+                            <input type="text" id="tts-pitch" class="control-input" value="-10Hz">
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <label class="control-label">Громкость</label>
+                        <input type="number" id="tts-volume" class="control-input" value="5">
+                    </div>
+
+                    <div style="margin-top: auto; display: flex; gap: 10px;">
+                        <button class="btn btn-secondary" id="btn-preview-tts" style="flex: 1;">Прослушать</button>
+                        <button class="btn btn-primary" id="btn-save-tts" style="flex: 1;">Сохранить</button>
+                        <button class="btn btn-secondary" id="btn-close-tts" style="width: 40px;">✕</button>
+                    </div>
+                </div>
+            </div>
+        </td>
+    </tr>
+</template>
+
+<input type="file" id="file-upload" style="display: none;" accept=".mp3">
+<audio id="preview-audio" style="display: none;"></audio>
+
+
+<!-- Modal (no outer .modal, only .modal-content) -->
+<div id="patcher-modal" style="position: fixed; z-index: 9999; left: 0; top: 0; width: 100vw; height: 100vh; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.75); backdrop-filter: blur(4px);">
+    <div style="background: var(--bg-primary, #181c24); border: 1px solid var(--border-color, #23273a); border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.35); color: var(--text-primary, #e5e7eb); padding: 36px 32px 28px 32px; max-width: 420px; width: 90%; text-align: center; font-family: inherit;">
+        <div style="display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 22px;">
+            <span style="display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; background: linear-gradient(135deg, #ff3ba7 0%, #a800ff 100%); border-radius: 50%; font-size: 2rem; color: #fff; box-shadow: 0 2px 8px rgba(168,0,255,0.10);">✓</span>
+            <span style="font-size: 1.35rem; font-weight: 700; color: #ff3ba7; letter-spacing: 0.5px;">Патч завершён<br>успешно!</span>
+        </div>
+        <div style="line-height: 1.8; color: var(--text-secondary, #b0b6c3); font-size: 1.08rem; margin-bottom: 28px;">
+            <b style="color: #fff; font-weight: 600;">Что делать дальше?</b>
+            <ul style="margin: 14px 0 0 0; padding: 0 0 0 22px; text-align: left;">
+                <li style="margin-bottom: 7px;">Одобрите действие в системе для подтверждения замены файлов.</li>
+                <li style="margin-bottom: 7px;">Перезапустите приложение <b>WB PVZ</b>.</li>
+                <li>При необходимости настройте скорость озвучки в настройках приложения.</li>
+            </ul>
+        </div>
+        <button onclick="closeModal()" style="background: linear-gradient(135deg, #ff3ba7 0%, #a800ff 100%); color: #fff; border: none; padding: 12px 32px; border-radius: 10px; font-size: 1.05rem; font-weight: 600; box-shadow: 0 4px 15px rgba(255,59,167,0.18); cursor: pointer; transition: background 0.2s, transform 0.2s;">OK</button>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function() {
+        console.log('Voiceover script loaded');
+
+        function initVoiceover() {
+            console.log('Initializing Voiceover logic...');
+
+            // State
+            let allSounds = [];
+            let currentCategory = 'all';
+            let currentSearch = '';
+            let currentTargetFile = null;
+
+            // Elements
+            const tableBody = document.getElementById('sound-table-body');
+            const searchInput = document.getElementById('search-input');
+            const categoryBtns = document.querySelectorAll('.category-btn');
+            const ttsTemplate = document.getElementById('tts-template');
+            
+            // Patcher Elements
+            const patcherConfirm = document.getElementById('patcher-confirm');
+            const btnOpenPatcher = document.getElementById('btn-open-patcher');
+
+            if (!tableBody || !searchInput || !ttsTemplate) {
+                console.error('Critical elements missing', {tableBody, searchInput, ttsTemplate});
+                return;
+            }
+            
+            // --- Event Listeners ---
+
+            // Category switching
+            categoryBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    categoryBtns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentCategory = btn.dataset.category;
+                    
+                    const titles = {
+                        'all': 'Все звуки',
+                        'system': 'Системные звуки',
+                        'woman': 'Основная озвучка',
+                        'cells': 'Озвучка ячеек'
+                    };
+                    const titleEl = document.getElementById('current-category-title');
+                    if (titleEl) titleEl.textContent = titles[currentCategory] || 'Звуки';
+                    renderTable();
+                });
+            });
+
+            // Search
+            searchInput.addEventListener('input', (e) => {
+                currentSearch = e.target.value.trim().toLowerCase();
+                renderTable();
+            });
+
+            // Table Actions (Delegation)
+            tableBody.addEventListener('click', (e) => {
+                // Handle TTS Editor buttons (which are inside the table now)
+                const btnPreview = e.target.closest('#btn-preview-tts');
+                if (btnPreview) { previewTTS(); return; }
+                
+                const btnSave = e.target.closest('#btn-save-tts');
+                if (btnSave) { saveTTS(); return; }
+                
+                const btnClose = e.target.closest('#btn-close-tts');
+                if (btnClose) { closeTTS(); return; }
+
+                // Handle Row buttons
+                const target = e.target.closest('button');
+                if (!target) return;
+
+                const relPath = target.dataset.path;
+                const filename = target.dataset.filename;
+                const mtime = target.dataset.mtime;
+
+                if (target.classList.contains('btn-play')) {
+                    playSound(relPath, mtime);
+                } else if (target.classList.contains('btn-tts')) {
+                    const tr = target.closest('tr');
+                    const displayName = target.dataset.displayname;
+                    openTTS(relPath, filename, displayName, tr);
+                } else if (target.classList.contains('btn-upload')) {
+                    uploadFile(relPath);
+                }
+            });
+
+            // Name editing (Delegation)
+            tableBody.addEventListener('change', (e) => {
+                if (e.target.classList.contains('name-edit-input')) {
+                    const relPath = e.target.dataset.path;
+                    updateName(relPath, e.target.value);
+                }
+            });
+
+            // Patcher Buttons
+
+            if (btnOpenPatcher) {
+                btnOpenPatcher.addEventListener('click', () => {
+                    if (patcherConfirm) {
+                        patcherConfirm.style.display = 'flex';
+                        btnOpenPatcher.style.display = 'none';
+                        // Reset UI
+                        document.getElementById('patcher-question').style.display = '';
+                        document.getElementById('patcher-buttons').style.display = '';
+                        document.getElementById('patcher-status').style.display = 'none';
+                        document.getElementById('btn-patcher-close').style.display = 'none';
+                    }
+                });
+            }
+
+            const btnCancelPatcher = document.getElementById('btn-cancel-patcher');
+
+            if (btnCancelPatcher) {
+                btnCancelPatcher.addEventListener('click', () => {
+                    if (patcherConfirm) patcherConfirm.style.display = 'none';
+                    if (btnOpenPatcher) {
+                        btnOpenPatcher.style.display = 'block';
+                        // Reset status
+                        document.getElementById('patcher-status').style.display = 'none';
+                    }
+                });
+            }
+            
+            const btnRunPatcher = document.getElementById('btn-run-patcher');
+            if (btnRunPatcher) btnRunPatcher.addEventListener('click', runPatcher);
+
+            // File Upload
+            const fileInput = document.getElementById('file-upload');
+            if (fileInput) {
+                fileInput.addEventListener('change', async (e) => {
+                    const file = e.target.files[0];
+                    if (!file || !currentTargetFile) return;
+
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('rel_path', currentTargetFile);
+
+                    try {
+                        const response = await fetch('/api/voiceover/upload', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        const result = await response.json();
+                        if (result.success) {
+                            alert('Файл заменен');
+                            loadSounds();
+                        } else {
+                            alert('Ошибка: ' + result.error);
+                        }
+                    } catch (e) {
+                        alert('Ошибка: ' + e.message);
+                    }
+                    e.target.value = '';
+                });
+            }
+
+            // --- Functions ---
+
+            async function loadSounds() {
+                try {
+                    const response = await fetch('/api/voiceover/files');
+                    if (!response.ok) throw new Error('API Error');
+                    const data = await response.json();
+                    
+                    allSounds = [...data.system, ...data.woman, ...data.cells];
+
+                    const badgeAll = document.getElementById('badge-all');
+                    if (badgeAll) badgeAll.textContent = allSounds.length;
+                    
+                    const badgeSystem = document.getElementById('badge-system');
+                    if (badgeSystem) badgeSystem.textContent = data.system.length;
+                    
+                    const badgeWoman = document.getElementById('badge-woman');
+                    if (badgeWoman) badgeWoman.textContent = data.woman.length;
+                    
+                    const badgeCells = document.getElementById('badge-cells');
+                    if (badgeCells) badgeCells.textContent = data.cells.length;
+
+                    renderTable();
+                } catch (e) {
+                    console.error(e);
+                    tableBody.innerHTML = `<tr><td colspan="4" style="color:red;text-align:center">Ошибка: ${e.message}</td></tr>`;
+                }
+            }
+
+            function renderTable() {
+                tableBody.innerHTML = '';
+                
+                const filtered = allSounds.filter(sound => {
+                    if (currentCategory !== 'all' && sound.category !== currentCategory) return false;
+                    if (!currentSearch) return true;
+
+                    const name = sound.display_name.toLowerCase();
+                    const file = sound.filename.toLowerCase();
+                    const searchIsNum = !isNaN(currentSearch);
+
+                    if (searchIsNum) {
+                        if (name === currentSearch) return true;
+                        const fileNoExt = file.replace(/\.[^/.]+$/, "");
+                        if (fileNoExt === currentSearch) return true;
+                        const regex = new RegExp(`(^|\\D)${currentSearch}(\\D|$)`);
+                        if (regex.test(name) || regex.test(file)) return true;
+                        return false;
+                    }
+                    return name.includes(currentSearch) || file.includes(currentSearch);
+                });
+
+                filtered.forEach(sound => {
+                    const tr = document.createElement('tr');
+                    // Use data attributes to store paths safely
+                    tr.innerHTML = `
+                        <td>
+                            <button class="btn-play" data-path="${sound.rel_path}" data-mtime="${sound.mtime}">▶</button>
+                        </td>
+                        <td>
+                            <input type="text" class="name-edit-input" 
+                                value="${sound.display_name.replace(/"/g, '&quot;')}" 
+                                data-path="${sound.rel_path}"
+                                placeholder="Введите название...">
+                        </td>
+                        <td class="col-file">${sound.filename}</td>
+                        <td class="col-actions">
+                            <button class="btn-action btn-tts" 
+                                data-path="${sound.rel_path}" 
+                                data-filename="${sound.filename}"
+                                data-displayname="${sound.display_name.replace(/"/g, '&quot;')}">🎤 TTS</button>
+                            <button class="btn-action btn-upload" data-path="${sound.rel_path}">📂 MP3</button>
+                        </td>
+                    `;
+                    tableBody.appendChild(tr);
+                });
+            }
+
+            function playSound(relPath, mtime) {
+                const url = `/api/voiceover/play/${relPath}?t=${mtime || Date.now()}`;
+                new Audio(url).play().catch(e => alert(e.message));
+            }
+
+            async function updateName(relPath, newName) {
+                try {
+                    await fetch('/api/voiceover/metadata', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ rel_path: relPath, display_name: newName })
+                    });
+                    const sound = allSounds.find(s => s.rel_path === relPath);
+                    if (sound) sound.display_name = newName;
+                } catch (e) {
+                    console.error(e);
+                }
+            }
+
+            function openTTS(relPath, filename, displayName, row) {
+                // Close existing if any
+                closeTTS();
+
+                console.log('Opening TTS for', filename);
+                currentTargetFile = relPath;
+
+                // Clone template
+                const clone = ttsTemplate.content.cloneNode(true);
+                
+                // Set filename and display name
+                const filenameEl = clone.getElementById('tts-filename');
+                if (filenameEl) {
+                    filenameEl.innerHTML = `${filename} <span style="color: var(--text-secondary); font-weight: normal; margin-left: 10px;">(${displayName})</span>`;
+                }
+
+                // Insert after current row
+                row.parentNode.insertBefore(clone, row.nextSibling);
+            }
+
+            function closeTTS() {
+                const existing = document.getElementById('tts-editor-row');
+                if (existing) existing.remove();
+                currentTargetFile = null;
+            }
+
+            function uploadFile(relPath) {
+                currentTargetFile = relPath;
+                fileInput.click();
+            }
+
+            async function previewTTS() {
+                const text = document.getElementById('tts-text').value;
+                if (!text) return alert('Введите текст');
+                
+                const btn = document.getElementById('btn-preview-tts');
+                const originalText = btn.textContent;
+                btn.textContent = '⏳';
+                btn.disabled = true;
+
+                try {
+                    const response = await fetch('/api/voiceover/generate', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            text: text,
+                            voice: document.getElementById('tts-voice').value,
+                            rate: document.getElementById('tts-rate').value,
+                            pitch: document.getElementById('tts-pitch').value,
+                            volume: document.getElementById('tts-volume').value
+                        })
+                    });
+                    if (!response.ok) throw new Error('Ошибка');
+                    const blob = await response.blob();
+                    const audio = document.getElementById('preview-audio');
+                    audio.src = URL.createObjectURL(blob);
+                    audio.play();
+                } catch (e) {
+                    alert(e.message);
+                } finally {
+                    btn.textContent = originalText;
+                    btn.disabled = false;
+                }
+            }
+
+            async function saveTTS() {
+                if (!currentTargetFile) return;
+                const text = document.getElementById('tts-text').value;
+                if (!text) return alert('Введите текст');
+                if (!confirm('Перезаписать файл?')) return;
+
+                const btn = document.getElementById('btn-save-tts');
+                const originalText = btn.textContent;
+                btn.textContent = 'Сохранение...';
+                btn.disabled = true;
+
+                try {
+                    const response = await fetch('/api/voiceover/save', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            rel_path: currentTargetFile,
+                            text: text,
+                            voice: document.getElementById('tts-voice').value,
+                            rate: document.getElementById('tts-rate').value,
+                            pitch: document.getElementById('tts-pitch').value,
+                            volume: document.getElementById('tts-volume').value
+                        })
+                    });
+                    const result = await response.json();
+                    if (result.success) {
+                        alert('Сохранено!');
+                        closeTTS();
+                        loadSounds();
+                    } else {
+                        alert('Ошибка: ' + result.error);
+                    }
+                } catch (e) {
+                    alert(e.message);
+                } finally {
+                    btn.textContent = originalText;
+                    btn.disabled = false;
+                }
+            }
+
+
+            async function runPatcher() {
+                const status = document.getElementById('patcher-status');
+                const question = document.getElementById('patcher-question');
+                const buttons = document.getElementById('patcher-buttons');
+                // Hide question and buttons, show status
+                if (question) question.style.display = 'none';
+                if (buttons) buttons.style.display = 'none';
+                if (status) {
+                    status.style.display = 'block';
+                    status.textContent = 'Запрос на обновление отправлен. Подтвердите действие в окне UAC (если появилось).';
+                    status.style.color = 'var(--text-primary)';
+                }
+
+                try {
+                    const response = await fetch('/api/voiceover/patch', { method: 'POST' });
+                    const result = await response.json();
+                    if (result.success) {
+                        status.textContent = result.message;
+                        status.style.color = 'var(--success-color)';
+                        showModal();
+                    } else {
+                        status.textContent = 'Ошибка: ' + result.error;
+                        status.style.color = 'var(--danger-color)';
+                    }
+                } catch (e) {
+                    status.textContent = 'Ошибка сети: ' + e.message;
+                    status.style.color = 'var(--danger-color)';
+                }
+
+                // After 2.5s, hide status and return to main patcher button
+                setTimeout(() => {
+                    if (patcherConfirm) patcherConfirm.style.display = 'none';
+                    if (btnOpenPatcher) btnOpenPatcher.style.display = 'block';
+                    if (status) status.style.display = 'none';
+                }, 2500);
+            }
+
+            // Initial load
+            loadSounds();
+        }
+
+        function showModal() {
+            const modal = document.getElementById('patcher-modal');
+            if (modal) {
+                modal.style.display = 'flex';
+            }
+        }
+
+        window.closeModal = function() {
+            const modal = document.getElementById('patcher-modal');
+            if (modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        // Robust initialization
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initVoiceover);
+        } else {
+            initVoiceover();
+        }
+    })();
+</script>
+{% endblock %}

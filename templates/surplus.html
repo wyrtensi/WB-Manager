@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}Излишки - WB Manager{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Излишки системы</h1>
+    <button class="btn btn-danger" onclick="clearSurplus()" id="clear-btn" style="display: none;">
+        🗑️ Очистить излишки
+    </button>
+</div>
+
+<div class="section">
+    <div class="section-header">
+        <h2 class="section-title">Товары без владельца</h2>
+        <span class="nav-badge" id="surplus-count">-</span>
+    </div>
+    <div class="section-content" id="surplus-container">
+        <div class="loading">
+            <div class="loading-spinner"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function loadSurplus() {
+    const container = document.getElementById('surplus-container');
+    
+    try {
+        const data = await API.get('/surplus');
+        
+        document.getElementById('surplus-count').textContent = data.count;
+        
+        if (!data.surplus || data.surplus.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state surplus-empty-state">
+                    <div class="empty-state-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                    <div class="empty-state-title">Излишков нет</div>
+                    <div class="empty-state-text">Все товары привязаны к владельцам</div>
+                </div>
+            `;
+            document.getElementById('clear-btn').style.display = 'none';
+            return;
+        }
+        
+        document.getElementById('clear-btn').style.display = 'flex';
+        
+        container.innerHTML = `
+            <div style="display: grid; gap: 12px;">
+                ${data.surplus.map(s => `
+                    <div class="surplus-item" id="surplus-${s.goods_uid}" style="background: var(--bg-secondary); border-radius: var(--radius-md); padding: 16px; display: flex; justify-content: space-between; align-items: center;">
+                        <div>ШК:
+                            <div class="goods-barcode" onclick="copyToClipboard('${s.scanned_code}')" style="margin-bottom: 8px; cursor: pointer;">
+                                ${s.scanned_code}
+                            </div>
+                            <div style="font-size: 12px; color: var(--text-muted);">
+                                UID: ${s.goods_uid}
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            ${s.cell ? `<span class="goods-cell">🗄️ ${s.cell}</span>` : ''}
+                            ${s.is_error_surplus ? '<span class="goods-status status-declined">Ошибка</span>' : ''}
+                            ${s.is_dbs ? '<span class="goods-tag">DBS</span>' : ''}
+                            <button class="btn btn-icon btn-danger" onclick="deleteSurplusItem('${s.goods_uid}')" title="Удалить">
+                                🗑️
+                            </button>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+        
+    } catch (err) {
+        console.error('Load surplus error:', err);
+        showError(container, 'Ошибка загрузки');
+    }
+}
+
+function clearSurplus() {
+    if (!confirm('Вы уверены, что хотите очистить все излишки?')) return;
+    
+    clearAllSurplus().then(() => {
+        loadSurplus();
+    });
+}
+
+async function deleteSurplusItem(goodsUid) {
+    try {
+        const res = await fetch(`/api/surplus/${goodsUid}`, { method: 'DELETE' });
+        const data = await res.json();
+        
+        if (data.success) {
+            // Удаляем элемент из DOM с анимацией
+            const item = document.getElementById(`surplus-${goodsUid}`);
+            if (item) {
+                item.style.transition = 'all 0.3s ease';
+                item.style.opacity = '0';
+                item.style.transform = 'translateX(50px)';
+                setTimeout(() => {
+                    item.remove();
+                    // Обновляем счётчик
+                    const countEl = document.getElementById('surplus-count');
+                    const current = parseInt(countEl.textContent) || 0;
+                    countEl.textContent = Math.max(0, current - 1);
+                    
+                    // Если ничего не осталось - показываем пустое состояние
+                    if (current - 1 <= 0) {
+                        loadSurplus();
+                    }
+                }, 300);
+            }
+        } else {
+            alert(data.error || 'Ошибка удаления');
+        }
+    } catch (err) {
+        console.error('Delete surplus error:', err);
+        alert('Ошибка удаления');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', loadSurplus);
+</script>
+{% endblock %}

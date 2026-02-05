@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+
+{% block title %}Обзор - WB Manager{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <p class="page-eyebrow">Главный экран WB Manager</p>
+        <h1 class="page-title">Обзор ПВЗ</h1>
+    </div>
+    <p class="page-helper">Цифры обновляются каждые 30 секунд · кликайте по карточкам для деталей</p>
+</div>
+
+<!-- Общий поиск -->
+<div class="search-primary-card">
+    <div class="search-card-header">
+        <div>
+            <p class="search-label">Общий поиск</p>
+            <p class="search-description">Моментально ищет по товарам, клиентам, заказам и истории</p>
+        </div>
+    </div>
+    <div class="search-card-body">
+        <div class="search-container">
+            <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input type="text" id="search-input" class="search-input" 
+                   placeholder="Начните печатать запрос...">
+        </div>
+    </div>
+</div>
+
+<!-- Остальные поиски -->
+<div class="search-board">
+    <div class="search-card">
+        <div class="search-card-header">
+            <p class="search-label">Название товара</p>
+            <p class="search-description">Увидите карточки с брендом и доступной ячейкой</p>
+        </div>
+        <div class="search-card-body">
+            <div class="search-field">
+                <input type="text" id="search-name-input" placeholder="Например, кеды, Hugo Boss...">
+                <button type="button" class="search-btn" data-search-action="name">Искать</button>
+            </div>
+            <div id="search-name-results" class="search-inline-results" data-empty="Подсказки появятся ниже"></div>
+        </div>
+    </div>
+    <div class="search-card">
+        <div class="search-card-header">
+            <p class="search-label">По ШК товара</p>
+            <p class="search-description">Сканируйте или введите штрихкод вручную</p>
+        </div>
+        <div class="search-card-body">
+            <div class="search-field">
+                <input type="text" id="search-barcode-input" placeholder="0000 0000 0000">
+                <button type="button" class="search-btn" data-search-action="barcode">Найти</button>
+            </div>
+            <div id="search-barcode-results" class="search-inline-results" data-empty="Ожидаем скан..."></div>
+        </div>
+    </div>
+    <div class="search-card">
+        <div class="search-card-header">
+            <p class="search-label">По клиентам</p>
+            <p class="search-description">Имя, телефон или SID · откроем профиль</p>
+        </div>
+        <div class="search-card-body">
+            <div class="search-field">
+                <input type="text" id="search-buyers-input" placeholder="Телефон, имя, SID...">
+                <button type="button" class="search-btn" data-search-action="buyers">Открыть</button>
+            </div>
+            <div id="search-buyers-results" class="search-inline-results" data-empty="Выберите клиента для просмотра"></div>
+        </div>
+    </div>
+    <div class="search-card">
+        <div class="search-card-header">
+            <p class="search-label">По заказам</p>
+            <p class="search-description">Находим выдачи по ШК товара</p>
+        </div>
+        <div class="search-card-body">
+            <div class="search-field">
+                <input type="text" id="search-orders-input" placeholder="ШК из истории выдачи">
+                <button type="button" class="search-btn" data-search-action="orders">История</button>
+            </div>
+            <div id="search-orders-results" class="search-inline-results" data-empty="Здесь появятся последние выдачи"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Быстрые действия -->
+<div class="module-actions-grid">
+    <a href="/voiceover" class="module-action voiceover">
+        <div class="module-icon">🎙️</div>
+        <div>
+            <div class="module-title">Озвучка</div>
+            <p class="module-text">Изменение вннутренней озвучки программы WB PVZ</p>
+        </div>
+    </a>
+    <a href="/bot" class="module-action telegram">
+        <div class="module-icon">🤖</div>
+        <div>
+            <div class="module-title">Telegram-бот</div>
+            <p class="module-text">Получайте уведомления о поставках и быстро сохраняйте фото на ПК</p>
+        </div>
+    </a>
+    <a href="/surplus" class="module-action surplus">
+        <div class="module-icon">📦</div>
+        <div>
+            <div class="module-title">Излишки</div>
+            <p class="module-text">Очищайте список товаров, принятых по ошибке</p>
+        </div>
+    </a>
+    <a href="/buyers" class="module-action buyers">
+        <div class="module-icon">👥</div>
+        <div>
+            <div class="module-title">Все клиенты</div>
+            <p class="module-text">Просматривайте профили и контакты в один клик</p>
+        </div>
+    </a>
+</div>
+
+<!-- Единая статистика -->
+<div class="stats-board">
+    <div class="stats-board-header">
+        <div>
+            <p class="stats-label">Сводные цифры</p>
+            <p class="stats-description">Показываем всё, что важно прямо сейчас</p>
+        </div>
+        <button type="button" class="btn btn-glass" onclick="loadStats(); loadStatusStats();">Обновить</button>
+    </div>
+    <div class="stats-warning">⚠️ Эти цифры ориентировочные и могут отличаться от фактических значений Wildberries.</div>
+    <div class="stats-grid stats-grid-hero">
+        <div class="stat-card purple">
+            <div class="stat-value" data-stat="goods_at_pickup">-</div>
+            <div class="stat-label">Товаров на ПВЗ</div>
+        </div>
+        <div class="stat-card blue">
+            <div class="stat-value" data-stat="goods_on_way">-</div>
+            <div class="stat-label">Товаров в пути</div>
+        </div>
+        <div class="stat-card green">
+            <div class="stat-value" data-stat="total_buyers">-</div>
+            <div class="stat-label">Всего клиентов</div>
+        </div>
+        <div class="stat-card orange">
+            <div class="stat-value" data-stat="occupied_cells">-</div>
+            <div class="stat-label">Занято ячеек</div>
+        </div>
+        <div class="stat-card red">
+            <div class="stat-value" data-stat="surplus_count">-</div>
+            <div class="stat-label">Излишков</div>
+        </div>
+    </div>
+    <div class="stats-status-block">
+        <p class="stats-label">Товары по статусам</p>
+        <div class="stats-grid stats-grid-status" id="status-stats">
+            <!-- Заполняется динамически -->
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Загрузка статистики по статусам
+async function loadStatusStats() {
+    try {
+        const stats = await API.get('/stats');
+        const statusStats = stats.by_status || {};
+        
+        const statusLabels = {
+            'GOODS_READY': { label: 'Готов к выдаче', class: 'green' },
+            'GOODS_RECIEVED': { label: 'Получен', class: 'blue' },
+            'GOODS_COURIER_RECEIVED': { label: 'У курьера', class: 'orange' },
+            'GOODS_DECLINED': { label: 'Отказ', class: 'red' },
+            'GOODS_ACCEPT_CLIENT_CANCELED': { label: 'Отменён', class: 'gray' }
+        };
+        
+        const container = document.getElementById('status-stats');
+        container.innerHTML = Object.entries(statusStats)
+            .filter(([status]) => statusLabels[status])
+            .map(([status, count]) => {
+                const { label, class: cls } = statusLabels[status];
+                return `
+                    <div class="stat-card ${cls}">
+                        <div class="stat-value">${count}</div>
+                        <div class="stat-label">${label}</div>
+                    </div>
+                `;
+            }).join('');
+    } catch (err) {
+        console.error('Load status stats error:', err);
+    }
+}
+
+// Автообновление статистики каждые 30 секунд
+let indexAutoRefresh = null;
+function startIndexAutoRefresh() {
+    if (indexAutoRefresh) clearInterval(indexAutoRefresh);
+    indexAutoRefresh = setInterval(() => {
+        loadStats();
+        loadStatusStats();
+    }, 30000);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadStatusStats();
+    startIndexAutoRefresh();
+});
+</script>
+{% endblock %}

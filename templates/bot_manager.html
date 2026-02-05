@@ -1,0 +1,796 @@
+{% extends "base.html" %}
+
+{% block title %}Telegram Бот - WB Manager{% endblock %}
+
+{% block extra_css %}
+<style>
+    .bot-container {
+        padding: 20px;
+        max-width: 1000px;
+        margin: 0 auto;
+    }
+
+    .status-card {
+        background: rgba(255,255,255,0.03);
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        padding: 24px;
+        margin-bottom: 24px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 20px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .status-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+    }
+
+    .status-group {
+        display: flex;
+        gap: 20px;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 20px;
+        border-radius: 25px;
+        font-weight: 600;
+        font-size: 0.95rem;
+        transition: all 0.3s ease;
+        border: 2px solid transparent;
+        backdrop-filter: blur(10px);
+    }
+
+    .status-badge.running {
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.1) 100%);
+        color: #10b981;
+        border-color: rgba(16, 185, 129, 0.3);
+        box-shadow: 0 0 15px rgba(16, 185, 129, 0.2);
+    }
+
+    .status-badge.stopped {
+        background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(239, 68, 68, 0.1) 100%);
+        color: #ef4444;
+        border-color: rgba(239, 68, 68, 0.3);
+        box-shadow: 0 0 15px rgba(239, 68, 68, 0.2);
+    }
+
+    .status-badge.auth-ok {
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(59, 130, 246, 0.1) 100%);
+        color: #3b82f6;
+        border-color: rgba(59, 130, 246, 0.3);
+        box-shadow: 0 0 15px rgba(59, 130, 246, 0.2);
+    }
+
+    .status-badge.auth-fail {
+        background: linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(245, 158, 11, 0.1) 100%);
+        color: #f59e0b;
+        border-color: rgba(245, 158, 11, 0.3);
+        box-shadow: 0 0 15px rgba(245, 158, 11, 0.2);
+    }
+
+    .status-icon {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: currentColor;
+        box-shadow: 0 0 0 3px rgba(255,255,255,0.3);
+        animation: pulse 2s infinite;
+    }
+
+    .status-badge.running .status-icon {
+        box-shadow: 0 0 10px currentColor;
+    }
+
+    @keyframes pulse {
+        0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+        70% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+
+    .config-section {
+        background: rgba(255,255,255,0.03);
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        padding: 28px;
+        margin-bottom: 24px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .config-section:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 25px rgba(0,0,0,0.25);
+    }
+
+    .section-title {
+        font-size: 1.2rem;
+        font-weight: 700;
+        margin-bottom: 24px;
+        color: var(--text-primary);
+        border-bottom: 2px solid var(--primary-color);
+        padding-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .section-title svg {
+        color: var(--primary-color);
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-label {
+        display: block;
+        margin-bottom: 8px;
+        color: var(--text-secondary);
+        font-size: 0.95rem;
+        font-weight: 500;
+    }
+
+    .form-input {
+        width: 100%;
+        padding: 12px 16px;
+        border-radius: 8px;
+        border: 2px solid var(--border-color);
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        font-family: inherit;
+        font-size: 1rem;
+        transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .form-input:focus {
+        border-color: var(--primary-color);
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    .form-hint {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        margin-top: 6px;
+    }
+
+    .users-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .user-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px;
+        background: rgba(255,255,255,0.02);
+        border-radius: 10px;
+        border: 1px solid var(--border-color);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .user-item:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+    }
+
+    .user-info {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .user-status {
+        font-size: 0.8rem;
+        padding: 4px 8px;
+        border-radius: 6px;
+        background: var(--bg-primary);
+        color: var(--text-secondary);
+        border: 1px solid var(--border-color);
+    }
+    
+    .user-status.authorized {
+        color: var(--success-color);
+        border: 1px solid var(--success-color);
+        background: rgba(16, 185, 129, 0.1);
+    }
+
+    .btn-icon {
+        background: transparent;
+        border: none;
+        color: var(--text-secondary);
+        cursor: pointer;
+        padding: 8px;
+        border-radius: 6px;
+        transition: background-color 0.2s ease, color 0.2s ease;
+    }
+
+    .btn-icon:hover {
+        background: rgba(239, 68, 68, 0.1);
+        color: var(--danger-color);
+    }
+
+    .toggle-switch {
+        position: relative;
+        display: inline-block;
+        width: 44px;
+        height: 22px;
+    }
+
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+
+    .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background-color: var(--bg-primary);
+        transition: .4s;
+        border-radius: 22px;
+        border: 1px solid var(--border-color);
+    }
+
+    .slider:before {
+        position: absolute;
+        content: "";
+        height: 16px;
+        width: 16px;
+        left: 2px;
+        bottom: 2px;
+        background-color: var(--text-secondary);
+        transition: .4s;
+        border-radius: 50%;
+    }
+
+    input:checked + .slider {
+        background-color: var(--primary-color);
+        border-color: var(--primary-color);
+    }
+
+    input:checked + .slider:before {
+        transform: translateX(22px);
+        background-color: white;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="bot-container">
+    <!-- Status Card -->
+    <div class="status-card">
+        <div class="status-group">
+            <div class="status-badge" id="bot-status-badge">
+                <div class="status-icon"></div>
+                <span id="bot-status-text">Проверка...</span>
+            </div>
+            <div class="status-badge" id="auth-status-badge" style="display: none;">
+                <div class="status-icon"></div>
+                <span id="auth-status-text">Авторизация WB</span>
+            </div>
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <button class="btn btn-success" id="btn-start-bot" style="display: none;">Запустить</button>
+            <button class="btn btn-danger" id="btn-stop-bot" style="display: none;">Остановить</button>
+            <button class="btn btn-secondary" id="btn-restart-bot">Перезагрузить</button>
+        </div>
+    </div>
+
+    <!-- Configuration -->
+    <div class="config-section">
+        <div class="section-title">Настройки</div>
+        
+        <div class="form-group">
+            <label class="form-label">Telegram Token</label>
+            <div style="display: flex; gap: 10px;">
+                <input type="password" class="form-input" id="config-token" placeholder="123456789:ABCdef...">
+                <button class="btn btn-secondary" onclick="togglePassword('config-token')">👁️</button>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Сообщение для необходимости авторизации чтобы работали уведомления поставок</label>
+            <textarea class="form-input" id="config-auth-msg" placeholder="Введите сообщение..." rows="3" style="resize: vertical;"></textarea>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Автозапуск бота</label>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <label class="toggle-switch" title="Не запускать при старте WB Manager">
+                    <input type="checkbox" id="config-skip-autostart">
+                    <span class="slider"></span>
+                </label>
+                <span style="font-size: 0.9rem;">Не включать при запуске</span>
+            </div>
+            <div class="form-hint">Если включено, бот не будет запускаться автоматически при старте WB Manager.</div>
+        </div>
+
+        <div style="text-align: right;">
+            <button class="btn btn-primary" id="btn-save-config">Сохранить настройки</button>
+        </div>
+    </div>
+
+    <!-- Maintenance Section -->
+    <div class="config-section">
+        <div class="section-title">Сохранение фото через бота на компьютер</div>
+        
+        <div class="form-group">
+            <label class="form-label">Папка для фото</label>
+            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                <input type="text" class="form-input" id="config-photo-dir" placeholder="photos">
+                <button class="btn btn-secondary" id="btn-select-dir" title="Выбрать папку">📂</button>
+                <button class="btn btn-primary" id="btn-save-photo-dir">Сохранить изменения</button>
+            </div>
+            <button class="btn btn-danger" id="btn-clear-photos" style="width: 100%;">Очистить папку</button>
+        </div>
+    </div>
+
+    <!-- Users Management -->
+    <div class="config-section">
+        <div class="section-title">Пользователи</div>
+        <div class="form-group">
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <input type="text" class="form-input" id="new-user-input" placeholder="username (без @)">
+                <input type="text" class="form-input" id="new-user-name" placeholder="Имя (необязательно)">
+                <button class="btn btn-primary" id="btn-add-user">Добавить</button>
+            </div>
+        </div>
+        <div class="users-list" id="users-list">
+            <!-- Users will be injected here -->
+        </div>
+    </div>
+
+    <!-- Инструкция по командам Telegram-бота -->
+    <div class="config-section bot-instruction-section">
+        <div class="section-title" style="display:flex;align-items:center;gap:10px;">
+            <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            Инструкция по командам Telegram-бота
+        </div>
+        <div class="bot-instruction-list">
+            <div class="bot-instruction-item">
+                <span class="bot-instruction-icon">📸</span>
+                <div>
+                    <b>Фото</b>: отправьте фото с подписью или без — бот сохранит его на компьютер. Первые 3 слова подписи станут названием файла.
+                </div>
+            </div>
+            <div class="bot-instruction-item">
+                <span class="bot-instruction-icon">🚚</span>
+                <div>
+                    <b>В пути</b>: отправьте <code>В пути</code> — получите список поставок, которые сейчас в пути.
+                </div>
+            </div>
+            <div class="bot-instruction-item">
+                <span class="bot-instruction-icon">📋</span>
+                <div>
+                    <b>Отчёт</b>: отправьте <code>Отчёт</code> — получите статистику поставок и приёмки за сегодня.
+                </div>
+            </div>
+            <div class="bot-instruction-item">
+                <span class="bot-instruction-icon">⏰</span>
+                <div>
+                    <b>Время на приемку</b>: отправьте <code>Время на приемку</code> — получите время, до которого нужно принять последнюю поставку.
+                </div>
+            </div>
+            <div class="bot-instruction-item">
+                <span class="bot-instruction-icon">🔐</span>
+                <div>
+                    <b>Авторизация WB</b>: отправьте номер телефона в формате +7XXXXXXXXXX или 8XXXXXXXXXX — бот поможет авторизоваться на сайте WB для получения уведомлений.
+                </div>
+            </div>
+            <div class="bot-instruction-item">
+                <span class="bot-instruction-icon">🛡️</span>
+                <div>
+                    <b>Доступ</b>: только пользователи из списка могут пользоваться ботом. Для доступа обратитесь к администратору.
+                </div>
+            </div>
+            <div class="bot-instruction-item admin-commands">
+                <span class="bot-instruction-icon">⚙️</span>
+                <div>
+                    <b>Админ-команды</b> (только для админов):
+                    <ul style="margin: 8px 0 0 20px; padding: 0;">
+                        <li><code>добавить username</code> — добавить пользователя (без @)</li>
+                        <li><code>удалить username</code> — удалить пользователя (без @)</li>
+                        <li><code>статус</code> — показать статус бота и список пользователей</li>
+                        <li><code>написать всем "далее - ваше сообщение, без кавычек"</code> — отправить сообщение всем пользователям</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="bot-instruction-footer">
+            Все команды можно отправлять как текстовые сообщения в чат с ботом. Уведомления о поставках приходят автоматически каждые 3 минуты, если включены в настройках.
+        </div>
+    </div>
+</div>
+<style>
+.bot-instruction-section {
+    background: rgba(255,255,255,0.03);
+    color: var(--text-primary);
+    margin-top: 32px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 28px;
+}
+
+.bot-instruction-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin: 20px 0 16px 0;
+}
+
+.bot-instruction-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    font-size: 1.02rem;
+    background: rgba(0,0,0,0.02);
+    border-radius: 8px;
+    padding: 12px 16px;
+    border-left: 4px solid #3b82f6;
+    border: 1px solid var(--border-color);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.bot-instruction-item:hover {
+    transform: translateX(4px);
+    box-shadow: 0 4px 15px rgba(59, 130, 246, 0.2);
+}
+
+.bot-instruction-item.admin-commands {
+    border-left-color: #f59e0b;
+    background: rgba(245, 158, 11, 0.05);
+}
+
+.bot-instruction-item.admin-commands:hover {
+    box-shadow: 0 4px 15px rgba(245, 158, 11, 0.2);
+}
+
+.bot-instruction-icon {
+    font-size: 1.3em;
+    width: 1.8em;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.bot-instruction-item ul {
+    margin: 8px 0 0 0;
+    padding-left: 20px;
+}
+
+.bot-instruction-item li {
+    margin-bottom: 4px;
+    color: var(--text-secondary);
+}
+
+.bot-instruction-item code {
+    background: rgba(59, 130, 246, 0.2);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.9em;
+}
+
+.bot-instruction-footer {
+    margin-top: 16px;
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    padding: 12px;
+    background: rgba(0,0,0,0.02);
+    border-radius: 6px;
+    border: 1px solid rgba(0,0,0,0.05);
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function togglePassword(id) {
+        const el = document.getElementById(id);
+        el.type = el.type === 'password' ? 'text' : 'password';
+    }
+
+    (function() {
+        const els = {
+            botBadge: document.getElementById('bot-status-badge'),
+            botText: document.getElementById('bot-status-text'),
+            authBadge: document.getElementById('auth-status-badge'),
+            authText: document.getElementById('auth-status-text'),
+            btnStart: document.getElementById('btn-start-bot'),
+            btnStop: document.getElementById('btn-stop-bot'),
+            btnRestart: document.getElementById('btn-restart-bot'),
+            token: document.getElementById('config-token'),
+            authMsg: document.getElementById('config-auth-msg'),
+            photoDir: document.getElementById('config-photo-dir'),
+            skipAutostart: document.getElementById('config-skip-autostart'),
+            usersList: document.getElementById('users-list'),
+            newUser: document.getElementById('new-user-input'),
+            newUserName: document.getElementById('new-user-name'),
+            btnAddUser: document.getElementById('btn-add-user'),
+            btnSaveConfig: document.getElementById('btn-save-config'),
+            btnSavePhotoDir: document.getElementById('btn-save-photo-dir'),
+            btnClearPhotos: document.getElementById('btn-clear-photos'),
+            btnSelectDir: document.getElementById('btn-select-dir')
+        };
+
+        let currentConfig = {};
+
+        async function updateStatus() {
+            try {
+                const res = await fetch('/api/bot/status?t=' + Date.now());
+                const data = await res.json();
+                
+                if (data.running) {
+                    els.botBadge.className = 'status-badge running';
+                    els.botText.textContent = 'Бот запущен';
+                    els.btnStart.style.display = 'none';
+                    els.btnStop.style.display = 'block';
+                    
+                    els.authBadge.style.display = 'inline-flex';
+                    
+                    const configRes = await fetch('/api/bot/config?t=' + Date.now());
+                    const config = await configRes.json();
+                    
+                    if (config.is_authorized) {
+                        els.authBadge.className = 'status-badge auth-ok';
+                        els.authText.textContent = 'Авторизован на WB';
+                    } else {
+                        els.authBadge.className = 'status-badge auth-fail';
+                        els.authText.textContent = 'Нет авторизации WB';
+                    }
+                    
+                } else {
+                    els.botBadge.className = 'status-badge stopped';
+                    els.botText.textContent = 'Бот остановлен';
+                    els.btnStart.style.display = 'block';
+                    els.btnStop.style.display = 'none';
+                    els.authBadge.style.display = 'none';
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function loadConfig() {
+            try {
+                const res = await fetch('/api/bot/config');
+                currentConfig = await res.json();
+                
+                els.token.value = currentConfig.telegram_token || '';
+                els.authMsg.value = currentConfig.auth_message || '';
+                els.photoDir.value = currentConfig.photo_save_path || 'photos';
+                els.skipAutostart.checked = !!currentConfig.skip_autostart;
+                
+                renderUsers();
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        function renderUsers() {
+            els.usersList.innerHTML = '';
+            const allowed = currentConfig.allowed_users || [];
+            const notified = currentConfig.notification_enabled_users || [];
+            const chatIds = currentConfig.user_chat_ids || {};
+            const userNames = currentConfig.user_names || {};
+
+            allowed.forEach(user => {
+                const isNotified = notified.includes(user);
+                const chatId = chatIds[user];
+                const name = userNames[user] || '';
+                
+                const div = document.createElement('div');
+                div.className = 'user-item';
+                div.innerHTML = `
+                    <div class="user-info">
+                        <div style="display: flex; flex-direction: column;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="font-weight: 600;">@${user}</span>
+                                <input type="text" 
+                                    class="form-input" 
+                                    style="padding: 2px 5px; width: 150px; font-size: 0.9rem;" 
+                                    placeholder="Имя" 
+                                    value="${name}"
+                                    onchange="updateUserName('${user}', this.value)"
+                                >
+                            </div>
+                            <div style="margin-top: 4px; font-size: 0.85rem; color: var(--text-secondary);">
+                                ${chatId ? 
+                                    `<span style="color: var(--success-color);">● Активен (ID: ${chatId})</span>` : 
+                                    `<span style="color: var(--warning-color);">○ Не писал боту</span>`
+                                }
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <div style="display: flex; flex-direction: column; align-items: flex-end;">
+                            <label class="toggle-switch" title="Администратор">
+                                <input type="checkbox" ${currentConfig.admins && currentConfig.admins.includes(user) ? 'checked' : ''} onchange="toggleAdmin('${user}', this.checked)">
+                                <span class="slider"></span>
+                            </label>
+                            <span style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 2px;">Админ</span>
+                        </div>
+                        <div style="display: flex; flex-direction: column; align-items: flex-end;">
+                            <label class="toggle-switch" title="Уведомления о поставках">
+                                <input type="checkbox" ${isNotified ? 'checked' : ''} onchange="toggleNotify('${user}', this.checked)">
+                                <span class="slider"></span>
+                            </label>
+                            <span style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 2px;">Уведомления</span>
+                        </div>
+                        <button class="btn-icon" onclick="removeUser('${user}')" title="Удалить">🗑️</button>
+                    </div>
+                `;
+                els.usersList.appendChild(div);
+            });
+        }
+
+        window.updateUserName = async (user, name) => {
+            if (!currentConfig.user_names) currentConfig.user_names = {};
+            currentConfig.user_names[user] = name;
+            await saveConfig(true);
+        };
+
+        window.toggleAdmin = async (user, enabled) => {
+            let admins = currentConfig.admins || [];
+            if (enabled) {
+                if (!admins.includes(user)) admins.push(user);
+            } else {
+                admins = admins.filter(u => u !== user);
+            }
+            currentConfig.admins = admins;
+            await saveConfig(true);
+        };
+
+        window.toggleNotify = async (user, enabled) => {
+            let notified = currentConfig.notification_enabled_users || [];
+            if (enabled) {
+                if (!notified.includes(user)) notified.push(user);
+            } else {
+                notified = notified.filter(u => u !== user);
+            }
+            currentConfig.notification_enabled_users = notified;
+            await saveConfig(true); // silent save
+        };
+
+        window.removeUser = async (user) => {
+            if (!confirm(`Удалить пользователя @${user}?`)) return;
+            currentConfig.allowed_users = currentConfig.allowed_users.filter(u => u !== user);
+            currentConfig.notification_enabled_users = currentConfig.notification_enabled_users.filter(u => u !== user);
+            if (currentConfig.admins) {
+                currentConfig.admins = currentConfig.admins.filter(u => u !== user);
+            }
+            if (currentConfig.user_names && currentConfig.user_names[user]) {
+                delete currentConfig.user_names[user];
+            }
+            await saveConfig();
+        };
+
+        async function saveConfig(silent = false) {
+            const newConfig = {
+                ...currentConfig,
+                telegram_token: els.token.value,
+                auth_message: els.authMsg.value,
+                photo_save_path: els.photoDir.value,
+                skip_autostart: els.skipAutostart.checked
+            };
+
+            try {
+                const res = await fetch('/api/bot/config', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(newConfig)
+                });
+                const result = await res.json();
+                if (result.success) {
+                    if (!silent) alert('Настройки сохранены');
+                    loadConfig(); // reload to sync
+                } else {
+                    alert('Ошибка: ' + result.error);
+                }
+            } catch (e) {
+                alert('Ошибка сети: ' + e.message);
+            }
+        }
+
+        // Event Listeners
+        els.btnStart.onclick = async () => {
+            await fetch('/api/bot/start', {method: 'POST'});
+            setTimeout(updateStatus, 1000);
+        };
+
+        els.btnStop.onclick = async () => {
+            await fetch('/api/bot/stop', {method: 'POST'});
+            setTimeout(updateStatus, 1000);
+        };
+
+        els.btnRestart.onclick = async () => {
+            await fetch('/api/bot/stop', {method: 'POST'});
+            setTimeout(async () => {
+                await fetch('/api/bot/start', {method: 'POST'});
+                setTimeout(updateStatus, 1000);
+            }, 2000);
+        };
+
+        els.btnSaveConfig.onclick = () => saveConfig();
+        els.btnSavePhotoDir.onclick = () => saveConfig();
+        els.skipAutostart.onchange = () => saveConfig(true);
+
+        els.btnSelectDir.onclick = async () => {
+            try {
+                els.btnSelectDir.disabled = true;
+                const res = await fetch('/api/utils/select-folder', {method: 'POST'});
+                const data = await res.json();
+                if (data.success && data.path) {
+                    els.photoDir.value = data.path;
+                }
+            } catch (e) {
+                console.error(e);
+                alert('Ошибка при открытии диалога');
+            } finally {
+                els.btnSelectDir.disabled = false;
+            }
+        };
+
+        els.btnAddUser.onclick = async () => {
+            const user = els.newUser.value.trim().replace('@', '');
+            const name = els.newUserName.value.trim();
+            if (!user) return;
+            
+            if (!currentConfig.allowed_users) currentConfig.allowed_users = [];
+            if (currentConfig.allowed_users.includes(user)) return alert('Пользователь уже добавлен');
+            
+            currentConfig.allowed_users.push(user);
+            
+            if (name) {
+                if (!currentConfig.user_names) currentConfig.user_names = {};
+                currentConfig.user_names[user] = name;
+            }
+
+            // Enable notifications by default
+            if (!currentConfig.notification_enabled_users) currentConfig.notification_enabled_users = [];
+            currentConfig.notification_enabled_users.push(user);
+            
+            // First user is admin by default if no admins exist
+            if (!currentConfig.admins || currentConfig.admins.length === 0) {
+                currentConfig.admins = [user];
+            }
+
+            await saveConfig();
+            els.newUser.value = '';
+            els.newUserName.value = '';
+        };
+
+        els.btnClearPhotos.onclick = async () => {
+            if (!confirm('Удалить все фото из папки?')) return;
+            try {
+                const res = await fetch('/api/bot/clear_photos', {method: 'POST'});
+                const result = await res.json();
+                if (result.success) {
+                    alert(`Удалено файлов: ${result.count}`);
+                } else {
+                    alert('Ошибка при удалении');
+                }
+            } catch (e) {
+                alert(e.message);
+            }
+        };
+
+        // Init
+        loadConfig();
+        updateStatus();
+        setInterval(updateStatus, 5000);
+    })();
+</script>
+{% endblock %}

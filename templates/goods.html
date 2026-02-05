@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}{% if '/on-way' in request.path %}Товары в пути{% else %}Товары на ПВЗ{% endif %} - WB Manager{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">{% if '/on-way' in request.path %}Товары в пути{% else %}Товары на ПВЗ{% endif %}</h1>
+</div>
+
+<!-- Поиск -->
+<div class="search-row">
+    <div class="search-container" style="flex: 1;">
+        <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+        <input type="text" id="goods-search" class="search-input" 
+               placeholder="Поиск по ШК, названию товара или бренду...">
+    </div>
+</div>
+
+{% if '/on-way' not in request.path %}
+<!-- Табы фильтрации по статусу -->
+<div class="search-row">
+    <div class="tabs tabs-compact" id="status-tabs">
+        <button class="tab active" data-status="all">Все</button>
+        <button class="tab" data-status="GOODS_READY">Готов к выдаче</button>
+        <button class="tab" data-status="GOODS_RECIEVED">Получен</button>
+        <button class="tab" data-status="GOODS_COURIER_RECEIVED">У курьера</button>
+        <button class="tab" data-status="GOODS_DECLINED">Отказ</button>
+    </div>
+</div>
+{% endif %}
+
+<!-- Сетка товаров -->
+<div id="goods-container" data-type="{% if '/on-way' in request.path %}on-way{% else %}pickup{% endif %}">
+    <div class="loading">
+        <div class="loading-spinner"></div>
+        <span>Загрузка товаров...</span>
+    </div>
+</div>
+
+<!-- Пагинация -->
+<div id="pagination" style="display: flex; justify-content: center; gap: 8px; margin-top: 24px;">
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentStatus = 'all';
+let currentPage = 1;
+const isOnWay = '{{ "on-way" if "/on-way" in request.path else "pickup" }}' === 'on-way';
+
+// Обработка табов статуса
+document.querySelectorAll('#status-tabs .tab').forEach(tab => {
+    tab.addEventListener('click', function() {
+        document.querySelectorAll('#status-tabs .tab').forEach(t => t.classList.remove('active'));
+        this.classList.add('active');
+        currentStatus = this.dataset.status;
+        currentPage = 1;
+        loadFilteredGoods();
+    });
+});
+
+// Поиск
+if (typeof window._goodsSearchTimeout === 'undefined') window._goodsSearchTimeout = null;
+document.getElementById('goods-search').addEventListener('input', (e) => {
+    clearTimeout(window._goodsSearchTimeout);
+    window._goodsSearchTimeout = setTimeout(() => {
+        performGoodsSearch(e.target.value);
+    }, 300);
+});
+
+async function loadFilteredGoods() {
+    const container = document.getElementById('goods-container');
+    const limit = 20;
+    const offset = (currentPage - 1) * limit;
+    
+    try {
+        showLoading(container);
+        
+        let endpoint = isOnWay ? `/goods/on-way?limit=${limit}&offset=${offset}` : `/goods/pickup?limit=${limit}&offset=${offset}`;
+        if (!isOnWay && currentStatus !== 'all') {
+            endpoint += `&status=${currentStatus}`;
+        }
+        
+        const data = await API.get(endpoint);
+        renderGoodsGrid(container, data.goods);
+    } catch (err) {
+        console.error('Load goods error:', err);
+        showError(container, 'Ошибка загрузки');
+    }
+}
+
+async function performGoodsSearch(query) {
+    if (query.length < 2) {
+        loadFilteredGoods();
+        return;
+    }
+    
+    const container = document.getElementById('goods-container');
+    try {
+        showLoading(container);
+        const data = await API.get(`/search/goods?q=${encodeURIComponent(query)}&by=all`);
+        renderGoodsGrid(container, data.goods || []);
+    } catch (err) {
+        console.error('Search error:', err);
+    }
+}
+
+// Автообновление данных каждые 30 секунд
+let autoRefreshInterval = null;
+function startAutoRefresh() {
+    if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+    autoRefreshInterval = setInterval(() => {
+        // Обновляем только если нет активного поиска
+        const searchInput = document.getElementById('goods-search');
+        if (!searchInput.value.trim()) {
+            loadFilteredGoods();
+        }
+    }, 30000);
+}
+
+// Загружаем товары при открытии страницы
+document.addEventListener('DOMContentLoaded', () => {
+    loadFilteredGoods();
+    startAutoRefresh();
+});
+</script>
+{% endblock %}

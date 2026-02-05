@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}История выдачи - WB Manager{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">История выдачи</h1>
+</div>
+
+<!-- Поиск -->
+<div class="search-row">
+    <div class="search-container" style="flex: 1;">
+        <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+        <input type="text" id="history-search" class="search-input" 
+               placeholder="Поиск по ШК или номеру заказа...">
+    </div>
+</div>
+
+<!-- Список заказов -->
+<div id="history-container">
+    <div class="loading">
+        <div class="loading-spinner"></div>
+        <span>Загрузка истории...</span>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Поиск
+if (typeof window._historySearchTimeout === 'undefined') window._historySearchTimeout = null;
+document.getElementById('history-search').addEventListener('input', (e) => {
+    clearTimeout(window._historySearchTimeout);
+    const query = e.target.value.trim();
+    
+    window._historySearchTimeout = setTimeout(() => {
+        loadDelivered(document.getElementById('history-container'), query);
+    }, 300);
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadDelivered(document.getElementById('history-container'));
+});
+</script>
+{% endblock %}

@@ -1,0 +1,10 @@
+{
+  "telegram_token": "INSERT_YOUR_TOKEN_HERE",
+  "allowed_users": [],
+  "auth_message": "Уведомления о поставках недоступны. Необходима повторная авторизация. Для этого введите свой номер телефона. После этого подтвердите кодом из приложения. Во избежание конфликтов авторизацию проводить тому, кто сейчас находится на смене.",
+  "photo_save_path": "photos",
+  "notification_enabled_users": [],
+  "is_bot_enabled": true,
+  "user_names": {},
+  "admins": []
+}
